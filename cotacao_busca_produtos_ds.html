@@ -3,447 +3,421 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Leitor Code 128 - Solução Definitiva</title>
+    <title>Sistema Cotação - Integração com Leitor QR</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Biblioteca específica para Code 128 -->
-    <script src="https://cdn.jsdelivr.net/npm/@ericblade/quagga2@1.7.2/dist/quagga.min.js"></script>
     <style>
         body {
             font-family: 'Inter', sans-serif;
-            background: #0f172a;
-            margin: 0;
-            padding: 0;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
         }
-        .scanner-container {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 70vh;
-            background: #000;
-            z-index: 10;
-        }
-        #interactive {
-            width: 100%;
-            height: 100%;
-            position: relative;
-        }
-        .scan-overlay {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.7);
-            clip-path: polygon(
-                0% 0%, 0% 100%, 
-                15% 100%, 15% 25%, 
-                85% 25%, 85% 75%, 
-                15% 75%, 15% 100%, 
-                100% 100%, 100% 0%
-            );
-        }
-        .scan-frame {
-            position: absolute;
-            top: 25%;
-            left: 15%;
-            width: 70%;
-            height: 50%;
-            border: 3px solid #10b981;
-            border-radius: 10px;
-            background: rgba(16, 185, 129, 0.1);
-        }
-        .scan-line {
-            position: absolute;
-            height: 3px;
-            background: #ff0000;
-            width: 100%;
-            top: 50%;
-            animation: scan 2s ease-in-out infinite;
-            box-shadow: 0 0 10px rgba(255,0,0,0.7);
-        }
-        @keyframes scan {
-            0% { top: 10%; }
-            50% { top: 90%; }
-            100% { top: 10%; }
-        }
-        .controls {
-            position: fixed;
-            bottom: 0;
-            left: 0;
-            width: 100%;
+        .card {
             background: white;
-            padding: 20px;
-            border-radius: 20px 20px 0 0;
-            box-shadow: 0 -5px 20px rgba(0,0,0,0.1);
-            z-index: 20;
+            border-radius: 1rem;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
         }
-        .result-card {
+        .step-card {
+            background: #f8fafc;
+            border-left: 4px solid #10b981;
+            border-radius: 8px;
+        }
+        .product-card {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
-            border-radius: 15px;
-            margin: 10px 0;
+            border-radius: 10px;
         }
     </style>
 </head>
 
-<body>
-    <!-- Scanner em Tela Cheia -->
-    <div class="scanner-container">
-        <div id="interactive" class="viewport">
-            <div class="scan-overlay"></div>
-            <div class="scan-frame">
-                <div class="scan-line"></div>
+<body class="flex items-center justify-center p-4">
+    <div class="card w-full max-w-2xl p-6">
+        <!-- Cabeçalho -->
+        <div class="text-center mb-6">
+            <h1 class="text-2xl font-bold text-gray-800 mb-2">
+                🏪 Sistema de Cotação
+            </h1>
+            <p class="text-gray-600">Integração com Leitor de Código de Barras</p>
+        </div>
+
+        <!-- Método 1: Usar App Externo (RECOMENDADO) -->
+        <div class="step-card p-4 mb-6">
+            <h3 class="font-bold text-gray-800 mb-3">🎯 MÉTODO 1: Use seu App "Leitor QR"</h3>
+            
+            <div class="space-y-3">
+                <div class="flex items-start">
+                    <span class="bg-green-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm mr-2 mt-1 flex-shrink-0">1</span>
+                    <span>Abra o app <strong>"Leitor QR"</strong> no seu celular</span>
+                </div>
+                
+                <div class="flex items-start">
+                    <span class="bg-green-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm mr-2 mt-1 flex-shrink-0">2</span>
+                    <span>Aponte para o código de barras e <strong>leia o código</strong></span>
+                </div>
+                
+                <div class="flex items-start">
+                    <span class="bg-green-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm mr-2 mt-1 flex-shrink-0">3</span>
+                    <span>Cole o código lido aqui:</span>
+                </div>
+                
+                <div class="flex gap-2 mt-2">
+                    <input type="text" id="scannedCode" 
+                           placeholder="Cole aqui o código lido pelo app"
+                           class="flex-1 p-3 border border-gray-300 rounded-lg text-center font-mono text-lg">
+                    <button onclick="processScannedCode()" class="bg-green-500 hover:bg-green-600 text-white font-semibold px-4 rounded-lg">
+                        ✅ Buscar
+                    </button>
+                </div>
             </div>
-            <div class="absolute top-10 left-0 right-0 text-center text-white">
-                <div class="text-xl font-bold">🎯 LEITOR CODE 128</div>
-                <div class="text-sm opacity-80">Centralize o código na área verde</div>
+        </div>
+
+        <!-- Método 2: Leitor Web (Alternativo) -->
+        <div class="step-card p-4 mb-6">
+            <h3 class="font-bold text-gray-800 mb-3">📱 MÉTODO 2: Leitor Web (Teste)</h3>
+            
+            <div class="text-center">
+                <button onclick="openWebScanner()" class="w-full bg-blue-500 hover:bg-blue-600 text-white font-semibold py-3 rounded-lg mb-2">
+                    📷 Tentar Leitor Web
+                </button>
+                <p class="text-sm text-gray-600">Pode não funcionar em todos os celulares</p>
             </div>
         </div>
-    </div>
 
-    <!-- Controles -->
-    <div class="controls">
-        <!-- Status -->
-        <div id="status" class="p-3 bg-blue-50 rounded-lg mb-4">
-            <div class="text-center text-blue-700 font-semibold">
-                🔄 Preparando leitor Code 128...
-            </div>
-        </div>
-
-        <!-- Botões -->
-        <div class="grid grid-cols-2 gap-3 mb-4">
-            <button onclick="startCode128Scanner()" class="bg-green-500 hover:bg-green-600 text-white font-semibold py-4 rounded-lg transition duration-200 text-lg">
-                📷 Iniciar Leitor
-            </button>
-            <button onclick="stopScanner()" class="bg-red-500 hover:bg-red-600 text-white font-semibold py-4 rounded-lg transition duration-200 text-lg">
-                🛑 Parar Leitor
-            </button>
-        </div>
-
-        <!-- Teste Code 128 -->
-        <div class="text-center mb-4">
-            <button onclick="testCode128()" class="bg-purple-500 hover:bg-purple-600 text-white font-semibold py-3 px-6 rounded-lg transition duration-200">
-                🧪 Testar Code 128
-            </button>
-        </div>
-
-        <!-- Debug -->
-        <div class="bg-gray-800 text-green-400 p-3 rounded font-mono text-sm mb-4 hidden" id="debugPanel">
-            <div id="debugInfo">Aguardando inicialização...</div>
-        </div>
-    </div>
-
-    <!-- Resultado -->
-    <div id="result" class="hidden fixed inset-0 bg-black bg-opacity-50 z-30 flex items-center justify-center p-4">
-        <div class="bg-white rounded-2xl p-6 w-full max-w-sm">
-            <div class="text-center mb-4">
-                <div class="text-4xl mb-2">✅</div>
-                <div class="font-bold text-green-700 text-xl">PRODUTO ENCONTRADO!</div>
+        <!-- Campo de Entrada Rápida -->
+        <div class="bg-white border border-gray-200 rounded-lg p-4 mb-6">
+            <h3 class="font-semibold text-gray-800 mb-3">⌨️ Entrada Rápida</h3>
+            
+            <div class="flex gap-2 mb-3">
+                <input type="text" id="quickInput" 
+                       placeholder="Digite o código manualmente"
+                       class="flex-1 p-3 border border-gray-300 rounded-lg text-center font-mono"
+                       maxlength="20">
+                <button onclick="processQuickInput()" class="bg-purple-500 hover:bg-purple-600 text-white font-semibold px-4 rounded-lg">
+                    🔍 Buscar
+                </button>
             </div>
             
-            <div class="result-card p-4 mb-4">
-                <div class="flex justify-between items-center mb-3">
-                    <span class="font-semibold">Código:</span>
-                    <span id="resultCode" class="font-mono bg-white text-black px-3 py-1 rounded border-2">0000000</span>
+            <div class="grid grid-cols-2 gap-2">
+                <button onclick="fillCode('1234567')" class="p-2 bg-gray-100 hover:bg-gray-200 rounded text-sm">
+                    1234567 - Arroz
+                </button>
+                <button onclick="fillCode('7654321')" class="p-2 bg-gray-100 hover:bg-gray-200 rounded text-sm">
+                    7654321 - Feijão
+                </button>
+                <button onclick="fillCode('1122334')" class="p-2 bg-gray-100 hover:bg-gray-200 rounded text-sm">
+                    1122334 - Óleo
+                </button>
+                <button onclick="fillCode('9730000')" class="p-2 bg-gray-100 hover:bg-gray-200 rounded text-sm">
+                    9730000 - Teste
+                </button>
+            </div>
+        </div>
+
+        <!-- Resultado -->
+        <div id="result" class="hidden">
+            <div class="product-card p-4 mb-4">
+                <div class="flex justify-between items-start mb-3">
+                    <h3 class="font-bold text-lg" id="productName">Nome do Produto</h3>
+                    <span class="bg-white text-purple-600 px-2 py-1 rounded text-sm font-mono" id="productCode">0000000</span>
                 </div>
-                <div id="resultDetails" class="text-sm">
-                    <!-- Detalhes do produto -->
+                <div class="grid grid-cols-2 gap-2 text-sm">
+                    <div>Preço:</div>
+                    <div class="font-bold" id="productPrice">R$ 0,00</div>
+                    <div>Marca:</div>
+                    <div id="productBrand">Marca</div>
+                    <div>Estoque:</div>
+                    <div id="productStock">Disponível</div>
+                    <div>Categoria:</div>
+                    <div id="productCategory">Categoria</div>
                 </div>
             </div>
 
             <div class="grid grid-cols-2 gap-3">
-                <button onclick="closeResult()" class="bg-gray-500 hover:bg-gray-600 text-white font-semibold py-3 rounded-lg">
+                <button onclick="addToQuote()" class="bg-green-500 hover:bg-green-600 text-white font-semibold py-3 rounded-lg">
+                    🛒 Adicionar
+                </button>
+                <button onclick="newSearch()" class="bg-gray-500 hover:bg-gray-600 text-white font-semibold py-3 rounded-lg">
                     🔄 Novo Scan
                 </button>
-                <button onclick="addProduct()" class="bg-green-500 hover:bg-green-600 text-white font-semibold py-3 rounded-lg">
-                    ➕ Adicionar
-                </button>
+            </div>
+        </div>
+
+        <!-- Carrinho -->
+        <div id="cart" class="hidden mt-6">
+            <h3 class="font-bold text-gray-800 mb-3">📋 Itens da Cotação</h3>
+            <div id="cartItems" class="space-y-2 mb-3">
+                <!-- Itens do carrinho -->
+            </div>
+            <div class="flex justify-between items-center font-bold text-lg border-t pt-3">
+                <span>Total:</span>
+                <span id="cartTotal">R$ 0,00</span>
+            </div>
+        </div>
+
+        <!-- Status -->
+        <div id="status" class="mt-4 text-center">
+            <div class="text-sm text-gray-600">
+                ⚡ Use o app "Leitor QR" e cole o código acima
             </div>
         </div>
     </div>
 
+    <!-- Modal Web Scanner -->
+    <div id="webScannerModal" class="hidden fixed inset-0 bg-black z-50">
+        <div class="absolute top-4 left-0 right-0 text-center text-white z-10">
+            <div class="text-lg font-bold">📷 Leitor Web</div>
+            <div class="text-sm">Aponte para o código de barras</div>
+        </div>
+        
+        <div id="webScanner" class="w-full h-full bg-black">
+            <!-- O scanner será inserido aqui -->
+        </div>
+        
+        <button onclick="closeWebScanner()" class="absolute bottom-4 left-0 right-0 mx-auto w-32 bg-red-500 hover:bg-red-600 text-white font-semibold py-3 rounded-lg">
+            🔴 Fechar
+        </button>
+    </div>
+
     <script>
-        // --- BANCO DE DADOS CODE 128 ---
+        // --- BANCO DE DADOS ---
         const productDatabase = {
             '1234567': {
-                descricao: 'ARROZ TIO JOÃO 5KG - CODE128',
+                descricao: 'ARROZ TIO JOÃO 5KG',
                 preco: '24.90',
                 marca: 'Tio João',
                 estoque: '45 unidades',
-                codigo: '1234567'
+                categoria: 'Alimentos'
             },
             '7654321': {
-                descricao: 'FEIJÃO CARIOCA 1KG - CODE128',
+                descricao: 'FEIJÃO CARIOCA 1KG',
                 preco: '8.90',
-                marca: 'Camil', 
+                marca: 'Camil',
                 estoque: '32 unidades',
-                codigo: '7654321'
+                categoria: 'Alimentos'
             },
             '1122334': {
-                descricao: 'ÓLEO DE SOJA 900ML - CODE128',
+                descricao: 'ÓLEO DE SOJA 900ML',
                 preco: '6.50',
                 marca: 'Liza',
-                estoque: '28 unidades',
-                codigo: '1122334'
+                estoque: '28 unidades', 
+                categoria: 'Alimentos'
             },
             '9730000': {
-                descricao: 'PRODUTO TESTE CODE128',
+                descricao: 'PRODUTO TESTE',
                 preco: '12.50',
                 marca: 'Marca Teste',
                 estoque: '100 unidades',
-                codigo: '9730000'
-            },
-            '5512378': {
-                descricao: 'SABÃO EM PÓ OMO - CODE128',
-                preco: '15.90',
-                marca: 'Omo',
-                estoque: '20 unidades',
-                codigo: '5512378'
+                categoria: 'Teste'
             }
         };
 
-        let isScannerActive = false;
+        let cart = [];
 
-        // --- INICIAR LEITOR CODE 128 ---
-        function startCode128Scanner() {
-            if (isScannerActive) {
-                updateStatus('⚠️ Scanner já está ativo', 'blue');
+        // --- PROCESSAR CÓDIGO DO APP EXTERNO ---
+        function processScannedCode() {
+            const input = document.getElementById('scannedCode');
+            const code = input.value.trim();
+            
+            if (!code) {
+                showStatus('⚠️ Cole o código lido pelo app primeiro', 'red');
+                input.focus();
                 return;
             }
-
-            updateStatus('🔧 Iniciando leitor Code 128...', 'blue');
-            showDebug('Inicializando Quagga para Code 128...');
-
-            // CONFIGURAÇÃO ESPECÍFICA PARA CODE 128
-            Quagga.init({
-                inputStream: {
-                    name: "Live",
-                    type: "LiveStream",
-                    target: document.querySelector("#interactive"),
-                    constraints: {
-                        width: 640,
-                        height: 480,
-                        facingMode: "environment",
-                        aspectRatio: { min: 1, max: 2 }
-                    },
-                    area: {
-                        top: "25%",
-                        right: "15%", 
-                        left: "15%",
-                        bottom: "25%"
-                    }
-                },
-                decoder: {
-                    readers: [
-                        "code_128_reader"  // APENAS CODE 128!
-                    ],
-                    multiple: false
-                },
-                locator: {
-                    patchSize: "x-large",
-                    halfSample: true
-                },
-                numOfWorkers: 2,
-                frequency: 10,
-                debug: {
-                    drawBoundingBox: true,
-                    showFrequency: true,
-                    drawScanline: true,
-                    showPattern: true
-                }
-            }, function(err) {
-                if (err) {
-                    console.error('Erro Quagga:', err);
-                    updateStatus(`❌ Erro: ${err.message}`, 'red');
-                    showDebug(`ERRO: ${err.message}`);
-                    return;
-                }
-                
-                updateStatus('✅ Leitor Code 128 ativo! Aponte para um código...', 'green');
-                showDebug('Leitor Code 128 iniciado - escaneando...');
-                
-                Quagga.start();
-                isScannerActive = true;
-                
-                // Configura timeout para parar se não detectar nada
-                setTimeout(() => {
-                    if (isScannerActive) {
-                        showDebug('Escaneando... aguardando código Code 128');
-                    }
-                }, 3000);
-            });
-
-            // DETECTOR CODE 128
-            Quagga.onDetected(function(result) {
-                if (!result || !result.codeResult) return;
-                
-                const code = result.codeResult.code;
-                const format = result.codeResult.format;
-                
-                showDebug(`📷 Detectado: ${code} (${format})`);
-                
-                // FILTRO: Aceita apenas Code 128
-                if (format === 'code_128' && code && code.length > 0) {
-                    updateStatus(`✅ Code 128 detectado: ${code}`, 'green');
-                    processDetectedCode(code);
-                } else {
-                    showDebug(`Ignorado: ${format} - ${code}`);
-                }
-            });
-
-            // LOGS DE PROCESSAMENTO
-            Quagga.onProcessed(function(result) {
-                if (result) {
-                    const ctx = Quagga.canvas.ctx.overlay;
-                    const canvas = Quagga.canvas.dom.overlay;
-                    
-                    if (result.box) {
-                        ctx.clearRect(0, 0, canvas.width, canvas.height);
-                        Quagga.ImageDebug.drawPath(result.box, {x: 0, y: 1}, ctx, {color: "red", lineWidth: 2});
-                    }
-                    
-                    if (result.codeResult && result.codeResult.code) {
-                        showDebug(`Processando: ${result.codeResult.code}`);
-                    }
-                }
-            });
+            
+            processProductCode(code);
+            input.value = ''; // Limpa o campo
         }
 
-        // --- PROCESSAR CÓDIGO DETECTADO ---
-        function processDetectedCode(code) {
-            // Para o scanner temporariamente
-            Quagga.stop();
-            isScannerActive = false;
+        // --- PROCESSAR ENTRADA RÁPIDA ---
+        function processQuickInput() {
+            const input = document.getElementById('quickInput');
+            const code = input.value.trim();
             
-            // Limpa e formata o código
-            const cleanCode = code.toString().trim().replace(/\D/g, '').substring(0, 7);
+            if (!code) {
+                showStatus('⚠️ Digite um código primeiro', 'red');
+                input.focus();
+                return;
+            }
             
-            if (cleanCode.length >= 3) { // Aceita códigos a partir de 3 dígitos
-                const product = productDatabase[cleanCode];
+            processProductCode(code);
+            input.value = '';
+        }
+
+        // --- PREENCHER CÓDIGO ---
+        function fillCode(code) {
+            document.getElementById('scannedCode').value = code;
+            document.getElementById('quickInput').value = code;
+            showStatus(`✅ Código ${code} preenchido! Clique em Buscar`, 'blue');
+        }
+
+        // --- PROCESSAR CÓDIGO DO PRODUTO ---
+        function processProductCode(code) {
+            showStatus('🔍 Buscando produto...', 'blue');
+            
+            // Simula delay de busca
+            setTimeout(() => {
+                const product = productDatabase[code];
                 
                 if (product) {
-                    showProductResult(cleanCode, product);
+                    showProductResult(code, product);
+                    showStatus('✅ Produto encontrado!', 'green');
                 } else {
-                    showProductNotFound(cleanCode);
+                    showProductNotFound(code);
+                    showStatus('❌ Produto não encontrado', 'red');
                 }
-            } else {
-                updateStatus('❌ Código muito curto', 'red');
-                setTimeout(() => {
-                    startCode128Scanner();
-                }, 2000);
-            }
+            }, 500);
         }
 
-        // --- MOSTRAR RESULTADO DO PRODUTO ---
+        // --- MOSTRAR RESULTADO ---
         function showProductResult(code, product) {
-            document.getElementById('resultCode').textContent = code;
-            
-            document.getElementById('resultDetails').innerHTML = `
-                <div class="space-y-2">
-                    <div><strong>Produto:</strong> ${product.descricao}</div>
-                    <div><strong>Marca:</strong> ${product.marca}</div>
-                    <div><strong>Preço:</strong> <span class="font-bold">R$ ${product.preco}</span></div>
-                    <div><strong>Estoque:</strong> ${product.estoque}</div>
-                    <div class="text-xs opacity-80 mt-2">✅ CODE 128 VÁLIDO</div>
-                </div>
-            `;
+            document.getElementById('productName').textContent = product.descricao;
+            document.getElementById('productCode').textContent = code;
+            document.getElementById('productPrice').textContent = `R$ ${product.preco}`;
+            document.getElementById('productBrand').textContent = product.marca;
+            document.getElementById('productStock').textContent = product.estoque;
+            document.getElementById('productCategory').textContent = product.categoria;
             
             document.getElementById('result').classList.remove('hidden');
-            showDebug(`PRODUTO ENCONTRADO: ${product.descricao}`);
+            document.getElementById('cart').classList.remove('hidden');
+            
+            // Scroll para o resultado
+            setTimeout(() => {
+                document.getElementById('result').scrollIntoView({ behavior: 'smooth' });
+            }, 100);
         }
 
         // --- PRODUTO NÃO ENCONTRADO ---
         function showProductNotFound(code) {
-            document.getElementById('resultCode').textContent = code;
-            
-            document.getElementById('resultDetails').innerHTML = `
-                <div class="text-center">
-                    <div class="text-red-300 font-bold mb-2">PRODUTO NÃO CADASTRADO</div>
-                    <div class="text-xs">Código: ${code}</div>
-                    <div class="text-xs opacity-80 mt-2">⚠️ Cadastre este produto</div>
-                </div>
-            `;
+            document.getElementById('productName').textContent = 'PRODUTO NÃO CADASTRADO';
+            document.getElementById('productCode').textContent = code;
+            document.getElementById('productPrice').textContent = '---';
+            document.getElementById('productBrand').textContent = '---';
+            document.getElementById('productStock').textContent = '---';
+            document.getElementById('productCategory').textContent = '---';
             
             document.getElementById('result').classList.remove('hidden');
-            showDebug(`PRODUTO NÃO CADASTRADO: ${code}`);
         }
 
-        // --- FECHAR RESULTADO ---
-        function closeResult() {
-            document.getElementById('result').classList.add('hidden');
-            // Reinicia o scanner
-            setTimeout(() => {
-                startCode128Scanner();
-            }, 500);
-        }
-
-        // --- ADICIONAR PRODUTO ---
-        function addProduct() {
-            const code = document.getElementById('resultCode').textContent;
-            updateStatus(`✅ Produto ${code} adicionado!`, 'green');
-            closeResult();
-        }
-
-        // --- PARAR SCANNER ---
-        function stopScanner() {
-            if (isScannerActive) {
-                Quagga.stop();
-                isScannerActive = false;
-            }
-            updateStatus('📷 Leitor parado', 'gray');
-            showDebug('Scanner parado pelo usuário');
-        }
-
-        // --- TESTE CODE 128 ---
-        function testCode128() {
-            const testCodes = ['1234567', '7654321', '1122334', '9730000', '5512378'];
-            const randomCode = testCodes[Math.floor(Math.random() * testCodes.length)];
+        // --- ADICIONAR À COTAÇÃO ---
+        function addToQuote() {
+            const code = document.getElementById('productCode').textContent;
+            const product = productDatabase[code];
             
-            updateStatus(`🧪 Testando Code 128: ${randomCode}`, 'purple');
-            processDetectedCode(randomCode);
+            if (product) {
+                const existingItem = cart.find(item => item.codigo === code);
+                
+                if (existingItem) {
+                    existingItem.quantidade += 1;
+                } else {
+                    cart.push({
+                        codigo: code,
+                        descricao: product.descricao,
+                        preco: product.preco,
+                        quantidade: 1
+                    });
+                }
+                
+                updateCartDisplay();
+                showStatus('✅ Produto adicionado à cotação!', 'green');
+            }
         }
 
-        // --- ATUALIZAR STATUS ---
-        function updateStatus(message, color) {
+        // --- ATUALIZAR CARRINHO ---
+        function updateCartDisplay() {
+            const cartItems = document.getElementById('cartItems');
+            const cartTotal = document.getElementById('cartTotal');
+            
+            if (cart.length === 0) {
+                cartItems.innerHTML = '<div class="text-center text-gray-500 py-2">Nenhum item</div>';
+                cartTotal.textContent = 'R$ 0,00';
+                return;
+            }
+            
+            let total = 0;
+            let itemsHTML = '';
+            
+            cart.forEach((item, index) => {
+                const itemTotal = parseFloat(item.preco) * item.quantidade;
+                total += itemTotal;
+                
+                itemsHTML += `
+                    <div class="flex justify-between items-center p-2 bg-gray-50 rounded border">
+                        <div class="flex-1">
+                            <div class="font-semibold text-sm">${item.descricao}</div>
+                            <div class="text-xs text-gray-600">
+                                R$ ${item.preco} × ${item.quantidade}
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span class="font-bold text-green-700 text-sm">R$ ${itemTotal.toFixed(2)}</span>
+                            <button onclick="removeFromCart(${index})" class="text-red-500 text-xs">
+                                ❌
+                            </button>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            cartItems.innerHTML = itemsHTML;
+            cartTotal.textContent = `R$ ${total.toFixed(2)}`;
+        }
+
+        // --- REMOVER DO CARRINHO ---
+        function removeFromCart(index) {
+            cart.splice(index, 1);
+            updateCartDisplay();
+            showStatus('🗑️ Item removido', 'gray');
+        }
+
+        // --- NOVA BUSCA ---
+        function newSearch() {
+            document.getElementById('result').classList.add('hidden');
+            document.getElementById('scannedCode').focus();
+            showStatus('🔍 Pronto para nova busca', 'blue');
+        }
+
+        // --- LEITOR WEB (ALTERNATIVO) ---
+        function openWebScanner() {
+            document.getElementById('webScannerModal').classList.remove('hidden');
+            showStatus('📷 Tentando abrir leitor web...', 'blue');
+            
+            // Aqui você pode integrar uma biblioteca web se quiser
+            // Por enquanto, é apenas um placeholder
+            setTimeout(() => {
+                showStatus('❌ Leitor web não disponível neste navegador', 'red');
+                setTimeout(closeWebScanner, 2000);
+            }, 3000);
+        }
+
+        function closeWebScanner() {
+            document.getElementById('webScannerModal').classList.add('hidden');
+        }
+
+        // --- MOSTRAR STATUS ---
+        function showStatus(message, color) {
             const statusElement = document.getElementById('status');
             const colorClass = {
-                blue: 'bg-blue-50 text-blue-700',
-                green: 'bg-green-50 text-green-700',
-                red: 'bg-red-50 text-red-700',
-                gray: 'bg-gray-50 text-gray-700',
-                purple: 'bg-purple-50 text-purple-700'
-            }[color] || 'bg-gray-50 text-gray-700';
+                blue: 'text-blue-600',
+                green: 'text-green-600',
+                red: 'text-red-600',
+                gray: 'text-gray-600'
+            }[color] || 'text-gray-600';
             
-            statusElement.className = `p-3 rounded-lg mb-4 ${colorClass}`;
-            statusElement.innerHTML = `<div class="text-center font-semibold">${message}</div>`;
-        }
-
-        // --- DEBUG ---
-        function showDebug(message) {
-            const debugPanel = document.getElementById('debugPanel');
-            const debugInfo = document.getElementById('debugInfo');
-            
-            debugPanel.classList.remove('hidden');
-            debugInfo.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            statusElement.innerHTML = `<div class="text-sm ${colorClass}">${message}</div>`;
         }
 
         // --- INICIALIZAÇÃO ---
         document.addEventListener('DOMContentLoaded', function() {
-            updateStatus('🎯 Leitor Code 128 Carregado', 'blue');
-            showDebug('Sistema pronto - Code 128');
+            showStatus('⚡ Use o app "Leitor QR" do seu celular', 'blue');
+            document.getElementById('scannedCode').focus();
             
-            // Inicia automaticamente após 1 segundo
-            setTimeout(() => {
-                startCode128Scanner();
-            }, 1000);
-        });
-
-        // Tecla Espaço para teste rápido
-        document.addEventListener('keydown', function(e) {
-            if (e.code === 'Space') {
-                testCode128();
-            }
+            // Enter nos inputs
+            document.getElementById('scannedCode').addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') processScannedCode();
+            });
+            
+            document.getElementById('quickInput').addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') processQuickInput();
+            });
         });
     </script>
 </body>
