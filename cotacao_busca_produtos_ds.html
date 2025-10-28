@@ -3,8 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sistema de Cotação - Câmera Funcionando</title>
+    <title>Sistema de Cotação - Leitor de Códigos</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Biblioteca QuaggaJS para ler códigos de barras -->
+    <script src="https://cdn.jsdelivr.net/npm/quagga@0.12.1/dist/quagga.min.js"></script>
     <style>
         body {
             font-family: 'Inter', sans-serif;
@@ -17,27 +19,6 @@
             box-shadow: 0 20px 40px rgba(0,0,0,0.1);
             border-top: 8px solid #10b981;
         }
-        .solution-step {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            border-radius: 10px;
-            padding: 15px;
-            margin: 10px 0;
-        }
-        .permission-guide {
-            background: #fef3cd;
-            border-left: 4px solid #f59e0b;
-            padding: 15px;
-            margin: 10px 0;
-            border-radius: 0 8px 8px 0;
-        }
-        .urgent-alert {
-            background: #fee2e2;
-            border: 2px solid #ef4444;
-            border-radius: 10px;
-            padding: 15px;
-            margin: 15px 0;
-        }
         .camera-preview {
             width: 100%;
             max-height: 300px;
@@ -45,282 +26,358 @@
             border-radius: 10px;
             background: #000;
         }
+        .scanner-overlay {
+            position: relative;
+        }
+        .scanner-line {
+            position: absolute;
+            height: 2px;
+            background: #ff0000;
+            width: 100%;
+            animation: scan 2s infinite;
+        }
+        @keyframes scan {
+            0% { top: 0; }
+            50% { top: 100%; }
+            100% { top: 0; }
+        }
+        #interactive.viewport {
+            position: relative;
+        }
     </style>
-    
-    <!-- DETECTOR GITHUB PAGES + TESTE CÂMERA -->
-    <script>
-    function checkGitHubPages() {
-        console.log('🔍 Verificando ambiente...');
-        
-        if (window.location.hostname.includes('github.io')) {
-            console.log('✅ GitHub Pages detectado');
-            
-            const diagnosis = document.getElementById('whatsappDiagnosis');
-            if (diagnosis) {
-                diagnosis.innerHTML = `
-                    <div class="text-green-700 font-semibold">
-                        ✅ GitHub Pages - Ambiente OK!
-                        <p class="text-sm font-normal mt-1">Câmera deve funcionar perfeitamente</p>
-                    </div>
-                `;
-            }
-            
-            addToLog('🌐 Executando em GitHub Pages - HTTPS ativo');
-            
-            setTimeout(() => {
-                testCameraOnGitHubPages();
-            }, 3000);
-        } else {
-            addToLog('⚠️ Ambiente local - Câmera pode não funcionar');
-        }
-    }
-
-    async function testCameraOnGitHubPages() {
-        try {
-            addToLog('📷 Testando câmera automaticamente...');
-            
-            const stream = await navigator.mediaDevices.getUserMedia({ 
-                video: { 
-                    facingMode: 'environment',
-                    width: { ideal: 1280 },
-                    height: { ideal: 720 }
-                } 
-            });
-            
-            addToLog('🎉 CÂMERA FUNCIONANDO PERFEITAMENTE!');
-            
-            stream.getTracks().forEach(track => track.stop());
-            
-            const diagnosis = document.getElementById('whatsappDiagnosis');
-            if (diagnosis) {
-                diagnosis.innerHTML = `
-                    <div class="text-green-700 font-semibold">
-                        🎉 SUCESSO TOTAL! Câmera liberada!
-                        <p class="text-sm font-normal mt-1">Agora você pode escanear códigos</p>
-                    </div>
-                `;
-            }
-            
-        } catch (error) {
-            addToLog('❌ Câmera ainda com problema: ' + error.message);
-        }
-    }
-
-    // FUNÇÃO IMPORTANTE: TESTE REAL COM CÂMERA
-    async function startRealCameraTest() {
-        addToLog('📷 Iniciando câmera REAL...');
-        
-        try {
-            const stream = await navigator.mediaDevices.getUserMedia({
-                video: { 
-                    facingMode: 'environment',
-                    width: { ideal: 1920 },
-                    height: { ideal: 1080 }
-                }
-            });
-            
-            addToLog('🎉 CÂMERA TRASEIRA ATIVA! Pronta para escanear!');
-            
-            // Cria preview da câmera
-            const cameraContainer = document.getElementById('cameraContainer');
-            if (cameraContainer) {
-                cameraContainer.innerHTML = `
-                    <div class="mb-4">
-                        <h3 class="font-semibold text-green-700 mb-2">📸 Câmera Ativa:</h3>
-                        <video id="cameraPreview" class="camera-preview" autoplay playsinline></video>
-                        <div class="flex gap-2 mt-2">
-                            <button onclick="stopCameraTest()" class="flex-1 bg-red-500 hover:bg-red-600 text-white py-2 rounded">
-                                🛑 Parar Câmera
-                            </button>
-                            <button onclick="simulateBarcodeFromCamera()" class="flex-1 bg-blue-500 hover:bg-blue-600 text-white py-2 rounded">
-                                🧪 Simular Leitura
-                            </button>
-                        </div>
-                    </div>
-                `;
-                
-                const videoElement = document.getElementById('cameraPreview');
-                videoElement.srcObject = stream;
-                videoElement.play();
-                
-                // Salva a stream para parar depois
-                window.currentStream = stream;
-            }
-            
-        } catch (error) {
-            addToLog('❌ Erro na câmera: ' + error.message);
-        }
-    }
-
-    function stopCameraTest() {
-        if (window.currentStream) {
-            window.currentStream.getTracks().forEach(track => track.stop());
-            addToLog('📷 Câmera parada');
-            
-            const cameraContainer = document.getElementById('cameraContainer');
-            if (cameraContainer) {
-                cameraContainer.innerHTML = '';
-            }
-        }
-    }
-
-    function simulateBarcodeFromCamera() {
-        addToLog('🔍 Simulando leitura da câmera...');
-        
-        const realCodes = ['123456', '789012', '345678', '112233', '456789'];
-        const randomCode = realCodes[Math.floor(Math.random() * realCodes.length)];
-        
-        addToLog(`📷 Câmera leu código: ${randomCode}`);
-        processScannedCode(randomCode);
-    }
-
-    function addToLog(message) {
-        const log = document.getElementById('systemLog');
-        if (log) {
-            log.innerHTML += `<div>> ${new Date().toLocaleTimeString()} - ${message}</div>`;
-            log.scrollTop = log.scrollHeight;
-        }
-        console.log(message);
-    }
-    </script>
 </head>
 
 <body class="flex items-center justify-center p-4">
     <div class="card w-full max-w-2xl p-6">
-        <!-- Cabeçalho Atualizado -->
+        <!-- Cabeçalho -->
         <div class="text-center mb-6">
             <h1 class="text-2xl font-bold text-gray-800 mb-2">
-                🎯 Sistema de Cotação
+                🎯 Leitor de Códigos de Barras
             </h1>
-            <p class="text-gray-600">Câmera funcionando no GitHub Pages!</p>
+            <p class="text-gray-600">Aponte para o código na embalagem</p>
         </div>
 
-        <!-- Status da Câmera -->
-        <div class="bg-green-50 p-4 rounded-lg mb-6">
-            <h3 class="font-semibold text-green-800 mb-2">✅ Status da Câmera:</h3>
-            <div id="whatsappDiagnosis" class="text-sm text-green-700">
-                Verificando...
+        <!-- Status -->
+        <div class="bg-blue-50 p-4 rounded-lg mb-4">
+            <h3 class="font-semibold text-blue-800 mb-2">📊 Status do Leitor:</h3>
+            <div id="scannerStatus" class="text-sm text-blue-700">
+                Pronto para iniciar...
             </div>
         </div>
 
-        <!-- Container da Câmera -->
-        <div id="cameraContainer" class="mb-6">
-            <!-- A câmera aparecerá aqui quando iniciada -->
+        <!-- Container do Scanner -->
+        <div id="scannerContainer" class="mb-4">
+            <div class="text-center text-gray-500 mb-4">
+                👆 Clique em "Iniciar Leitor" para escanear códigos
+            </div>
         </div>
 
-        <!-- Botões de Ação -->
-        <div class="grid grid-cols-1 gap-4 mb-6">
-            <button onclick="startRealCameraTest()" class="w-full bg-green-500 hover:bg-green-600 text-white font-semibold py-4 rounded-lg transition duration-200 text-lg">
-                📷 Iniciar Câmera Real
+        <!-- Botões de Controle -->
+        <div class="grid grid-cols-2 gap-3 mb-6">
+            <button onclick="startBarcodeScanner()" class="bg-green-500 hover:bg-green-600 text-white font-semibold py-3 rounded-lg transition duration-200">
+                📷 Iniciar Leitor
             </button>
-            
-            <button onclick="startAdvancedSimulation()" class="w-full bg-blue-500 hover:bg-blue-600 text-white font-semibold py-4 rounded-lg transition duration-200 text-lg">
-                🧪 Teste com Simulação
+            <button onclick="stopBarcodeScanner()" class="bg-red-500 hover:bg-red-600 text-white font-semibold py-3 rounded-lg transition duration-200">
+                🛑 Parar Leitor
             </button>
-
-            <button onclick="stopCameraTest()" class="w-full bg-red-500 hover:bg-red-600 text-white font-semibold py-3 rounded-lg transition duration-200">
-                🛑 Parar Câmera
+            <button onclick="startSimulation()" class="bg-blue-500 hover:bg-blue-600 text-white font-semibold py-3 rounded-lg transition duration-200 col-span-2">
+                🧪 Modo Simulação
             </button>
         </div>
 
-        <!-- Resultado do Teste -->
-        <div class="mb-6">
+        <!-- Resultado -->
+        <div class="mb-4">
             <label class="block text-sm font-medium text-gray-700 mb-2">
-                Código Escaneado:
+                Código Lido:
             </label>
-            <input type="text" id="testCodeResult" 
-                   class="w-full p-3 border-2 border-gray-300 rounded-lg bg-white font-mono text-center text-lg"
+            <input type="text" id="barcodeResult" 
+                   class="w-full p-3 border-2 border-gray-300 rounded-lg bg-white font-mono text-center text-lg font-bold"
                    placeholder="---"
                    readonly>
         </div>
 
         <!-- Informações do Produto -->
-        <div id="productInfo" class="bg-yellow-50 p-4 rounded-lg mb-6 hidden">
-            <!-- Informações do produto aparecerão aqui -->
+        <div id="productInfo" class="bg-green-50 border border-green-200 rounded-lg p-4 mb-4 hidden">
+            <h4 class="font-semibold text-green-800 mb-2">✅ Produto Encontrado:</h4>
+            <div id="productDetails" class="text-sm">
+                <!-- Detalhes do produto aparecerão aqui -->
+            </div>
         </div>
 
-        <!-- Log de Atividades -->
+        <!-- Dicas -->
+        <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-4">
+            <h4 class="font-semibold text-yellow-800 mb-1">💡 Dicas para escanear:</h4>
+            <ul class="text-sm text-yellow-700 list-disc list-inside space-y-1">
+                <li>Mantenha o código a ~15cm da câmera</li>
+                <li>Boa iluminação é essencial</li>
+                <li>Mantenha a câmera estável</li>
+                <li>Foque na área do código de barras</li>
+            </ul>
+        </div>
+
+        <!-- Log -->
         <div>
-            <h3 class="font-semibold text-gray-700 mb-2">📝 Log do Sistema:</h3>
-            <div id="systemLog" class="bg-gray-800 text-green-400 p-3 rounded font-mono text-sm max-h-32 overflow-y-auto">
-                <div>> Sistema carregado. Clique em "Iniciar Câmera Real"</div>
+            <h3 class="font-semibold text-gray-700 mb-2">📝 Log:</h3>
+            <div id="scannerLog" class="bg-gray-800 text-green-400 p-3 rounded font-mono text-sm max-h-32 overflow-y-auto">
+                <div>> Sistema carregado. Clique em "Iniciar Leitor"</div>
             </div>
         </div>
     </div>
 
     <script>
-        // --- BANCO DE DADOS REAL ---
+        // --- BANCO DE DADOS DE PRODUTOS ---
         const productDatabase = [
-            { codigo: '123456', descricao: 'MONITOR LED 24" FULL HD', vlUnit: '599.90', unidade: 'UN' },
-            { codigo: '789012', descricao: 'MOUSE GAMER RGB', vlUnit: '89.90', unidade: 'UN' },
-            { codigo: '345678', descricao: 'TECLADO MECÂNICO RGB', vlUnit: '199.90', unidade: 'UN' },
-            { codigo: '112233', descricao: 'MOUSE PAD GAMER GRANDE', vlUnit: '49.90', unidade: 'UN' },
-            { codigo: '456789', descricao: 'WEBCAM 1080P PROFISSIONAL', vlUnit: '159.90', unidade: 'UN' }
+            { 
+                codigo: '7891000315507', 
+                descricao: 'NESTON 200G', 
+                vlUnit: '8.90', 
+                unidade: 'UN',
+                marca: 'Nestlé'
+            },
+            { 
+                codigo: '7891910000197', 
+                descricao: 'AÇÚCAR CRISTAL 1KG', 
+                vlUnit: '4.50', 
+                unidade: 'UN',
+                marca: 'União'
+            },
+            { 
+                codigo: '7891999010026', 
+                descricao: 'ARROZ TIO JOÃO 1KG', 
+                vlUnit: '6.90', 
+                unidade: 'UN',
+                marca: 'Tio João'
+            },
+            { 
+                codigo: '7893000366644', 
+                descricao: 'CAFÉ PILÃO 500G', 
+                vlUnit: '18.90', 
+                unidade: 'UN',
+                marca: 'Pilão'
+            },
+            { 
+                codigo: '7894900011516', 
+                descricao: 'COCA-COLA 2L', 
+                vlUnit: '9.90', 
+                unidade: 'UN',
+                marca: 'Coca-Cola'
+            },
+            { 
+                codigo: '7896051111011', 
+                descricao: 'SABÃO EM PÓ OMO 1KG', 
+                vlUnit: '15.90', 
+                unidade: 'UN',
+                marca: 'Omo'
+            }
         ];
 
-        // --- SIMULAÇÃO AVANÇADA ---
-        function startAdvancedSimulation() {
-            addToLog('🎯 Iniciando simulação realista...');
-            
-            const realCodes = ['123456', '789012', '345678', '112233', '456789'];
-            let codeIndex = 0;
-            
-            function simulateNextCode() {
-                if (codeIndex < realCodes.length) {
-                    const code = realCodes[codeIndex];
-                    addToLog(`📷 Simulando leitura: ${code}`);
-                    
-                    document.getElementById('testCodeResult').value = 'Escaneando...';
-                    document.getElementById('testCodeResult').classList.add('border-yellow-500', 'bg-yellow-50', 'animate-pulse');
-                    
-                    setTimeout(() => {
-                        processScannedCode(code);
-                        codeIndex++;
-                        
-                        if (codeIndex < realCodes.length) {
-                            setTimeout(simulateNextCode, 2500);
-                        } else {
-                            addToLog('✅ Simulação concluída!');
-                        }
-                    }, 2000);
-                }
+        let isScannerActive = false;
+
+        // --- FUNÇÃO PRINCIPAL: INICIAR LEITOR ---
+        function startBarcodeScanner() {
+            if (isScannerActive) {
+                addToLog('⚠️ Scanner já está ativo');
+                return;
             }
-            
-            simulateNextCode();
+
+            addToLog('📷 Iniciando leitor de códigos...');
+            updateScannerStatus('Iniciando...', 'blue');
+
+            // Configuração do QuaggaJS
+            Quagga.init({
+                inputStream: {
+                    name: "Live",
+                    type: "LiveStream",
+                    target: document.querySelector('#scannerContainer'),
+                    constraints: {
+                        width: 640,
+                        height: 480,
+                        facingMode: "environment" // Câmera traseira
+                    }
+                },
+                decoder: {
+                    readers: [
+                        "ean_reader",
+                        "ean_8_reader",
+                        "code_128_reader",
+                        "code_39_reader",
+                        "upc_reader",
+                        "upc_e_reader"
+                    ]
+                },
+                locator: {
+                    patchSize: "medium",
+                    halfSample: true
+                }
+            }, function(err) {
+                if (err) {
+                    console.error(err);
+                    addToLog('❌ Erro ao iniciar scanner: ' + err.message);
+                    updateScannerStatus('Erro ao iniciar', 'red');
+                    return;
+                }
+                
+                addToLog('✅ Scanner iniciado! Aponte para um código...');
+                updateScannerStatus('📷 Escaneando... Aponte para o código', 'green');
+                
+                Quagga.start();
+                isScannerActive = true;
+                
+                // Cria visualização do scanner
+                createScannerView();
+            });
+
+            // Detecta quando um código é lido
+            Quagga.onDetected(function(result) {
+                if (result && result.codeResult) {
+                    const code = result.codeResult.code;
+                    addToLog(`📷 Código detectado: ${code}`);
+                    processBarcode(code);
+                }
+            });
         }
 
-        function processScannedCode(code) {
-            document.getElementById('testCodeResult').value = code;
-            document.getElementById('testCodeResult').classList.remove('border-yellow-500', 'bg-yellow-50', 'animate-pulse');
-            document.getElementById('testCodeResult').classList.add('border-green-500', 'bg-green-50');
+        // --- PARAR SCANNER ---
+        function stopBarcodeScanner() {
+            if (isScannerActive) {
+                Quagga.stop();
+                isScannerActive = false;
+                addToLog('🛑 Scanner parado');
+                updateScannerStatus('Scanner parado', 'gray');
+                
+                // Limpa a visualização
+                const scannerContainer = document.getElementById('scannerContainer');
+                scannerContainer.innerHTML = '<div class="text-center text-gray-500">👆 Clique em "Iniciar Leitor" para escanear códigos</div>';
+            }
+        }
+
+        // --- CRIAR VISUALIZAÇÃO DO SCANNER ---
+        function createScannerView() {
+            const scannerContainer = document.getElementById('scannerContainer');
+            scannerContainer.innerHTML = `
+                <div class="scanner-overlay">
+                    <div id="interactive" class="viewport"></div>
+                    <div class="scanner-line"></div>
+                </div>
+                <div class="text-center text-sm text-green-600 mt-2">
+                    🎯 Aponte a câmera para o código de barras
+                </div>
+            `;
+        }
+
+        // --- PROCESSAR CÓDIGO LIDO ---
+        function processBarcode(code) {
+            // Atualiza o campo de resultado
+            const resultField = document.getElementById('barcodeResult');
+            resultField.value = code;
+            resultField.classList.add('border-green-500', 'bg-green-50');
             
+            // Busca o produto no banco de dados
             const product = productDatabase.find(p => p.codigo === code);
             const productInfo = document.getElementById('productInfo');
+            const productDetails = document.getElementById('productDetails');
             
             if (product) {
                 addToLog(`✅ ${product.descricao} - R$ ${product.vlUnit}`);
                 
-                // Mostra informações do produto
+                // Mostra informações detalhadas do produto
                 productInfo.classList.remove('hidden');
-                productInfo.innerHTML = `
-                    <h4 class="font-semibold text-green-800 mb-2">✅ Produto Encontrado:</h4>
-                    <div class="text-sm">
-                        <p><strong>Descrição:</strong> ${product.descricao}</p>
-                        <p><strong>Preço:</strong> R$ ${product.vlUnit}</p>
-                        <p><strong>Unidade:</strong> ${product.unidade}</p>
+                productDetails.innerHTML = `
+                    <div class="grid grid-cols-2 gap-2">
+                        <div><strong>Descrição:</strong></div>
+                        <div>${product.descricao}</div>
+                        
+                        <div><strong>Marca:</strong></div>
+                        <div>${product.marca}</div>
+                        
+                        <div><strong>Preço:</strong></div>
+                        <div class="font-bold text-green-700">R$ ${product.vlUnit}</div>
+                        
+                        <div><strong>Unidade:</strong></div>
+                        <div>${product.unidade}</div>
                     </div>
                 `;
                 
-                showProductToast(product);
+                showSuccessToast(product);
+                
+                // Para o scanner automaticamente após ler
+                setTimeout(() => {
+                    stopBarcodeScanner();
+                }, 3000);
+                
             } else {
-                addToLog(`❌ Código ${code} não encontrado`);
+                addToLog(`❌ Código ${code} não encontrado no banco de dados`);
                 productInfo.classList.add('hidden');
+                
+                productInfo.classList.remove('hidden');
+                productInfo.classList.add('bg-red-50', 'border-red-200');
+                productDetails.innerHTML = `
+                    <div class="text-red-700">
+                        <strong>Produto não cadastrado</strong>
+                        <p class="text-sm mt-1">Código: ${code}</p>
+                        <p class="text-sm">Adicione este produto ao banco de dados</p>
+                    </div>
+                `;
             }
         }
 
-        function showProductToast(product) {
+        // --- MODO SIMULAÇÃO ---
+        function startSimulation() {
+            addToLog('🧪 Iniciando modo simulação...');
+            
+            const testCodes = [
+                '7891000315507', // NESTON
+                '7894900011516', // COCA-COLA
+                '7896051111011', // OMO
+                '9999999999999'  // Código inválido
+            ];
+            
+            let index = 0;
+            
+            function simulateNext() {
+                if (index < testCodes.length) {
+                    const code = testCodes[index];
+                    addToLog(`🧪 Simulando código: ${code}`);
+                    
+                    const resultField = document.getElementById('barcodeResult');
+                    resultField.value = 'Lendo...';
+                    resultField.classList.add('border-yellow-500', 'bg-yellow-50', 'animate-pulse');
+                    
+                    setTimeout(() => {
+                        processBarcode(code);
+                        index++;
+                        setTimeout(simulateNext, 3000);
+                    }, 2000);
+                } else {
+                    addToLog('✅ Simulação concluída');
+                }
+            }
+            
+            simulateNext();
+        }
+
+        // --- FUNÇÕES AUXILIARES ---
+        function updateScannerStatus(message, color) {
+            const status = document.getElementById('scannerStatus');
+            const colorClass = {
+                blue: 'text-blue-700',
+                green: 'text-green-700',
+                red: 'text-red-700',
+                gray: 'text-gray-700'
+            }[color] || 'text-gray-700';
+            
+            status.innerHTML = `<span class="${colorClass} font-semibold">${message}</span>`;
+        }
+
+        function addToLog(message) {
+            const log = document.getElementById('scannerLog');
+            log.innerHTML += `<div>> ${new Date().toLocaleTimeString()} - ${message}</div>`;
+            log.scrollTop = log.scrollHeight;
+        }
+
+        function showSuccessToast(product) {
             const toast = document.createElement('div');
-            toast.className = 'fixed top-4 right-4 bg-green-500 text-white p-4 rounded-lg shadow-lg transform translate-x-full transition-transform duration-300';
+            toast.className = 'fixed top-4 right-4 bg-green-500 text-white p-4 rounded-lg shadow-lg transform translate-x-full transition-transform duration-300 z-50';
             toast.innerHTML = `
                 <div class="font-semibold">✅ Produto Encontrado!</div>
                 <div class="text-sm">${product.descricao}</div>
@@ -337,41 +394,9 @@
 
         // --- INICIALIZAÇÃO ---
         document.addEventListener('DOMContentLoaded', function() {
-            addToLog('🚀 Sistema de cotação carregado');
-            
-            // Verifica se está no GitHub Pages
-            setTimeout(() => {
-                checkGitHubPages();
-            }, 1000);
-            
-            // Adiciona botão flutuante
-            addQuickTestButton();
+            addToLog('🚀 Leitor de códigos carregado');
+            updateScannerStatus('Pronto para iniciar', 'blue');
         });
-        
-        function addQuickTestButton() {
-            const existingButton = document.querySelector('#quickTestBtn');
-            if (!existingButton) {
-                const testBtn = document.createElement('button');
-                testBtn.id = 'quickTestBtn';
-                testBtn.textContent = '🚀 Testar Câmera';
-                testBtn.style.cssText = `
-                    position: fixed;
-                    bottom: 20px;
-                    right: 20px;
-                    background: #10b981;
-                    color: white;
-                    border: none;
-                    padding: 12px 16px;
-                    border-radius: 8px;
-                    font-size: 14px;
-                    cursor: pointer;
-                    z-index: 1000;
-                    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-                `;
-                testBtn.onclick = startRealCameraTest;
-                document.body.appendChild(testBtn);
-            }
-        }
     </script>
 </body>
 </html>
