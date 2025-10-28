@@ -3,38 +3,55 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Leitor de Códigos - Solução Definitiva</title>
+    <title>Leitor Code 128 - Solução Definitiva</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Vamos usar o JsBarcode para GERAR códigos e testar a leitura -->
-    <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
+    <!-- Biblioteca específica para Code 128 -->
+    <script src="https://cdn.jsdelivr.net/npm/@ericblade/quagga2@1.7.2/dist/quagga.min.js"></script>
     <style>
         body {
             font-family: 'Inter', sans-serif;
-            background: #1e293b;
-            min-height: 100vh;
+            background: #0f172a;
+            margin: 0;
+            padding: 0;
         }
-        .scanner-area {
+        .scanner-container {
+            position: fixed;
+            top: 0;
+            left: 0;
             width: 100%;
-            height: 60vh;
+            height: 70vh;
             background: #000;
-            position: relative;
-            overflow: hidden;
+            z-index: 10;
         }
-        #videoElement {
+        #interactive {
             width: 100%;
             height: 100%;
-            object-fit: cover;
+            position: relative;
+        }
+        .scan-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            clip-path: polygon(
+                0% 0%, 0% 100%, 
+                15% 100%, 15% 25%, 
+                85% 25%, 85% 75%, 
+                15% 75%, 15% 100%, 
+                100% 100%, 100% 0%
+            );
         }
         .scan-frame {
             position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            width: 80%;
-            height: 150px;
+            top: 25%;
+            left: 15%;
+            width: 70%;
+            height: 50%;
             border: 3px solid #10b981;
-            background: rgba(16, 185, 129, 0.1);
             border-radius: 10px;
+            background: rgba(16, 185, 129, 0.1);
         }
         .scan-line {
             position: absolute;
@@ -42,245 +59,298 @@
             background: #ff0000;
             width: 100%;
             top: 50%;
-            animation: scan 2s linear infinite;
+            animation: scan 2s ease-in-out infinite;
             box-shadow: 0 0 10px rgba(255,0,0,0.7);
         }
         @keyframes scan {
             0% { top: 10%; }
-            100% { top: 90%; }
+            50% { top: 90%; }
+            100% { top: 10%; }
         }
-        .debug-panel {
-            background: #0f172a;
-            color: #94a3b8;
-            font-family: monospace;
-            font-size: 12px;
+        .controls {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            background: white;
+            padding: 20px;
+            border-radius: 20px 20px 0 0;
+            box-shadow: 0 -5px 20px rgba(0,0,0,0.1);
+            z-index: 20;
+        }
+        .result-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 15px;
+            margin: 10px 0;
         }
     </style>
 </head>
 
-<body class="p-0">
-    <!-- Scanner Full Screen -->
-    <div class="scanner-area">
-        <video id="videoElement" autoplay playsinline muted></video>
-        <div class="scan-frame">
-            <div class="scan-line"></div>
-        </div>
-        <div class="absolute bottom-4 left-0 right-0 text-center text-white">
-            <div class="text-lg font-bold">🎯 Centralize o código aqui</div>
-            <div class="text-sm opacity-80">Mantenha estável e bem iluminado</div>
+<body>
+    <!-- Scanner em Tela Cheia -->
+    <div class="scanner-container">
+        <div id="interactive" class="viewport">
+            <div class="scan-overlay"></div>
+            <div class="scan-frame">
+                <div class="scan-line"></div>
+            </div>
+            <div class="absolute top-10 left-0 right-0 text-center text-white">
+                <div class="text-xl font-bold">🎯 LEITOR CODE 128</div>
+                <div class="text-sm opacity-80">Centralize o código na área verde</div>
+            </div>
         </div>
     </div>
 
     <!-- Controles -->
-    <div class="p-4 bg-white">
-        <div class="grid grid-cols-2 gap-3 mb-4">
-            <button onclick="startCamera()" class="bg-green-500 hover:bg-green-600 text-white font-semibold py-3 rounded-lg transition duration-200">
-                📷 Ligar Câmera
-            </button>
-            <button onclick="stopCamera()" class="bg-red-500 hover:bg-red-600 text-white font-semibold py-3 rounded-lg transition duration-200">
-                🔴 Parar Câmera
-            </button>
-        </div>
-
+    <div class="controls">
         <!-- Status -->
         <div id="status" class="p-3 bg-blue-50 rounded-lg mb-4">
             <div class="text-center text-blue-700 font-semibold">
-                🔄 Clique em "Ligar Câmera" para começar
+                🔄 Preparando leitor Code 128...
             </div>
         </div>
 
-        <!-- Debug Info -->
-        <div class="debug-panel p-3 rounded-lg mb-4 hidden" id="debugPanel">
-            <div class="font-bold mb-2">🔧 Debug Info:</div>
-            <div id="debugInfo">Aguardando dados...</div>
+        <!-- Botões -->
+        <div class="grid grid-cols-2 gap-3 mb-4">
+            <button onclick="startCode128Scanner()" class="bg-green-500 hover:bg-green-600 text-white font-semibold py-4 rounded-lg transition duration-200 text-lg">
+                📷 Iniciar Leitor
+            </button>
+            <button onclick="stopScanner()" class="bg-red-500 hover:bg-red-600 text-white font-semibold py-4 rounded-lg transition duration-200 text-lg">
+                🛑 Parar Leitor
+            </button>
+        </div>
+
+        <!-- Teste Code 128 -->
+        <div class="text-center mb-4">
+            <button onclick="testCode128()" class="bg-purple-500 hover:bg-purple-600 text-white font-semibold py-3 px-6 rounded-lg transition duration-200">
+                🧪 Testar Code 128
+            </button>
+        </div>
+
+        <!-- Debug -->
+        <div class="bg-gray-800 text-green-400 p-3 rounded font-mono text-sm mb-4 hidden" id="debugPanel">
+            <div id="debugInfo">Aguardando inicialização...</div>
         </div>
     </div>
 
     <!-- Resultado -->
-    <div id="result" class="hidden fixed bottom-0 left-0 right-0 bg-white p-4 rounded-t-2xl shadow-2xl">
-        <div class="text-center mb-4">
-            <div class="text-2xl">✅</div>
-            <div class="font-bold text-green-700">PRODUTO ENCONTRADO!</div>
-        </div>
-        
-        <div class="bg-gray-50 p-3 rounded-lg mb-3">
-            <div class="flex justify-between items-center mb-2">
-                <span class="font-semibold">Código:</span>
-                <span id="resultCode" class="font-mono bg-white px-2 py-1 rounded border">0000000</span>
+    <div id="result" class="hidden fixed inset-0 bg-black bg-opacity-50 z-30 flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl p-6 w-full max-w-sm">
+            <div class="text-center mb-4">
+                <div class="text-4xl mb-2">✅</div>
+                <div class="font-bold text-green-700 text-xl">PRODUTO ENCONTRADO!</div>
             </div>
-            <div id="resultDetails" class="text-sm">
-                <!-- Detalhes do produto -->
+            
+            <div class="result-card p-4 mb-4">
+                <div class="flex justify-between items-center mb-3">
+                    <span class="font-semibold">Código:</span>
+                    <span id="resultCode" class="font-mono bg-white text-black px-3 py-1 rounded border-2">0000000</span>
+                </div>
+                <div id="resultDetails" class="text-sm">
+                    <!-- Detalhes do produto -->
+                </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+                <button onclick="closeResult()" class="bg-gray-500 hover:bg-gray-600 text-white font-semibold py-3 rounded-lg">
+                    🔄 Novo Scan
+                </button>
+                <button onclick="addProduct()" class="bg-green-500 hover:bg-green-600 text-white font-semibold py-3 rounded-lg">
+                    ➕ Adicionar
+                </button>
             </div>
         </div>
-
-        <div class="grid grid-cols-2 gap-3">
-            <button onclick="closeResult()" class="bg-gray-500 hover:bg-gray-600 text-white font-semibold py-3 rounded-lg">
-                🔄 Novo Scan
-            </button>
-            <button onclick="addToSystem()" class="bg-green-500 hover:bg-green-600 text-white font-semibold py-3 rounded-lg">
-                ➕ Adicionar
-            </button>
-        </div>
-    </div>
-
-    <!-- Teste Rápido -->
-    <div class="fixed top-4 right-4">
-        <button onclick="simulateScan()" class="bg-purple-500 hover:bg-purple-600 text-white font-semibold px-4 py-2 rounded-lg shadow-lg">
-            🧪 Testar
-        </button>
     </div>
 
     <script>
-        // --- BANCO DE DADOS SIMPLES ---
+        // --- BANCO DE DADOS CODE 128 ---
         const productDatabase = {
             '1234567': {
-                descricao: 'ARROZ TIO JOÃO 5KG',
+                descricao: 'ARROZ TIO JOÃO 5KG - CODE128',
                 preco: '24.90',
                 marca: 'Tio João',
-                estoque: '45 unidades'
+                estoque: '45 unidades',
+                codigo: '1234567'
             },
             '7654321': {
-                descricao: 'FEIJÃO CARIOCA 1KG', 
+                descricao: 'FEIJÃO CARIOCA 1KG - CODE128',
                 preco: '8.90',
-                marca: 'Camil',
-                estoque: '32 unidades'
+                marca: 'Camil', 
+                estoque: '32 unidades',
+                codigo: '7654321'
             },
             '1122334': {
-                descricao: 'ÓLEO DE SOJA 900ML',
-                preco: '6.50', 
+                descricao: 'ÓLEO DE SOJA 900ML - CODE128',
+                preco: '6.50',
                 marca: 'Liza',
-                estoque: '28 unidades'
+                estoque: '28 unidades',
+                codigo: '1122334'
             },
             '9730000': {
-                descricao: 'PRODUTO TESTE 7 DIGITOS',
+                descricao: 'PRODUTO TESTE CODE128',
                 preco: '12.50',
-                marca: 'Marca Teste', 
-                estoque: '100 unidades'
+                marca: 'Marca Teste',
+                estoque: '100 unidades',
+                codigo: '9730000'
+            },
+            '5512378': {
+                descricao: 'SABÃO EM PÓ OMO - CODE128',
+                preco: '15.90',
+                marca: 'Omo',
+                estoque: '20 unidades',
+                codigo: '5512378'
             }
         };
 
-        let videoStream = null;
-        let scanInterval = null;
+        let isScannerActive = false;
 
-        // --- INICIAR CÂMERA DIRETO ---
-        async function startCamera() {
-            try {
-                updateStatus('📷 Acessando câmera...', 'blue');
-                showDebug(true);
-                
-                // Para stream anterior se existir
-                if (videoStream) {
-                    stopCamera();
-                }
-
-                // Configuração ULTRA SIMPLES
-                const constraints = {
-                    video: {
-                        facingMode: 'environment',
-                        width: { ideal: 1280 },
-                        height: { ideal: 720 }
-                    }
-                };
-
-                videoStream = await navigator.mediaDevices.getUserMedia(constraints);
-                const videoElement = document.getElementById('videoElement');
-                
-                videoElement.srcObject = videoStream;
-                
-                // Aguarda o vídeo estar pronto
-                videoElement.onloadedmetadata = function() {
-                    videoElement.play();
-                    updateStatus('✅ Câmera ativa! Aponte para um código', 'green');
-                    startManualScan();
-                };
-
-            } catch (error) {
-                console.error('Erro câmera:', error);
-                updateStatus(`❌ Erro: ${error.message}`, 'red');
-                showDebugInfo(`Erro: ${error.message}`);
+        // --- INICIAR LEITOR CODE 128 ---
+        function startCode128Scanner() {
+            if (isScannerActive) {
+                updateStatus('⚠️ Scanner já está ativo', 'blue');
+                return;
             }
-        }
 
-        // --- SCAN MANUAL (captura de tela periódica) ---
-        function startManualScan() {
-            // Cria canvas para captura
-            const canvas = document.createElement('canvas');
-            const context = canvas.getContext('2d');
-            const video = document.getElementById('videoElement');
-            
-            // Configura canvas com tamanho reduzido para performance
-            canvas.width = 320;
-            canvas.height = 240;
-            
-            scanInterval = setInterval(() => {
-                if (video.readyState === video.HAVE_ENOUGH_DATA) {
-                    try {
-                        // Desenha frame atual no canvas
-                        context.drawImage(video, 0, 0, canvas.width, canvas.height);
-                        
-                        // Aqui você implementaria o reconhecimento de código
-                        // Por enquanto, vamos simular a detecção
-                        simulateCodeDetection();
-                        
-                    } catch (e) {
-                        showDebugInfo(`Erro captura: ${e.message}`);
+            updateStatus('🔧 Iniciando leitor Code 128...', 'blue');
+            showDebug('Inicializando Quagga para Code 128...');
+
+            // CONFIGURAÇÃO ESPECÍFICA PARA CODE 128
+            Quagga.init({
+                inputStream: {
+                    name: "Live",
+                    type: "LiveStream",
+                    target: document.querySelector("#interactive"),
+                    constraints: {
+                        width: 640,
+                        height: 480,
+                        facingMode: "environment",
+                        aspectRatio: { min: 1, max: 2 }
+                    },
+                    area: {
+                        top: "25%",
+                        right: "15%", 
+                        left: "15%",
+                        bottom: "25%"
+                    }
+                },
+                decoder: {
+                    readers: [
+                        "code_128_reader"  // APENAS CODE 128!
+                    ],
+                    multiple: false
+                },
+                locator: {
+                    patchSize: "x-large",
+                    halfSample: true
+                },
+                numOfWorkers: 2,
+                frequency: 10,
+                debug: {
+                    drawBoundingBox: true,
+                    showFrequency: true,
+                    drawScanline: true,
+                    showPattern: true
+                }
+            }, function(err) {
+                if (err) {
+                    console.error('Erro Quagga:', err);
+                    updateStatus(`❌ Erro: ${err.message}`, 'red');
+                    showDebug(`ERRO: ${err.message}`);
+                    return;
+                }
+                
+                updateStatus('✅ Leitor Code 128 ativo! Aponte para um código...', 'green');
+                showDebug('Leitor Code 128 iniciado - escaneando...');
+                
+                Quagga.start();
+                isScannerActive = true;
+                
+                // Configura timeout para parar se não detectar nada
+                setTimeout(() => {
+                    if (isScannerActive) {
+                        showDebug('Escaneando... aguardando código Code 128');
+                    }
+                }, 3000);
+            });
+
+            // DETECTOR CODE 128
+            Quagga.onDetected(function(result) {
+                if (!result || !result.codeResult) return;
+                
+                const code = result.codeResult.code;
+                const format = result.codeResult.format;
+                
+                showDebug(`📷 Detectado: ${code} (${format})`);
+                
+                // FILTRO: Aceita apenas Code 128
+                if (format === 'code_128' && code && code.length > 0) {
+                    updateStatus(`✅ Code 128 detectado: ${code}`, 'green');
+                    processDetectedCode(code);
+                } else {
+                    showDebug(`Ignorado: ${format} - ${code}`);
+                }
+            });
+
+            // LOGS DE PROCESSAMENTO
+            Quagga.onProcessed(function(result) {
+                if (result) {
+                    const ctx = Quagga.canvas.ctx.overlay;
+                    const canvas = Quagga.canvas.dom.overlay;
+                    
+                    if (result.box) {
+                        ctx.clearRect(0, 0, canvas.width, canvas.height);
+                        Quagga.ImageDebug.drawPath(result.box, {x: 0, y: 1}, ctx, {color: "red", lineWidth: 2});
+                    }
+                    
+                    if (result.codeResult && result.codeResult.code) {
+                        showDebug(`Processando: ${result.codeResult.code}`);
                     }
                 }
-            }, 1000); // Verifica a cada segundo
-        }
-
-        // --- SIMULAR DETECÇÃO (REMOVA ISSO QUANDO INTEGRAR LEITOR REAL) ---
-        function simulateCodeDetection() {
-            // Esta função simula a detecção - substitua por um leitor real
-            const detectedCodes = ['1234567', '7654321', '1122334', '9730000'];
-            const randomIndex = Math.floor(Math.random() * detectedCodes.length);
-            const detectedCode = detectedCodes[randomIndex];
-            
-            showDebugInfo(`Simulando: ${detectedCode} | Frame capturado`);
-            
-            // 5% de chance de "detectar" um código (para teste)
-            if (Math.random() < 0.05) {
-                processDetectedCode(detectedCode);
-            }
+            });
         }
 
         // --- PROCESSAR CÓDIGO DETECTADO ---
         function processDetectedCode(code) {
-            // Para a verificação temporariamente
-            if (scanInterval) {
-                clearInterval(scanInterval);
-            }
+            // Para o scanner temporariamente
+            Quagga.stop();
+            isScannerActive = false;
             
-            updateStatus(`✅ Código detectado: ${code}`, 'green');
-            showDebugInfo(`CÓDIGO LIDO: ${code}`);
+            // Limpa e formata o código
+            const cleanCode = code.toString().trim().replace(/\D/g, '').substring(0, 7);
             
-            const product = productDatabase[code];
-            
-            if (product) {
-                showProductResult(code, product);
+            if (cleanCode.length >= 3) { // Aceita códigos a partir de 3 dígitos
+                const product = productDatabase[cleanCode];
+                
+                if (product) {
+                    showProductResult(cleanCode, product);
+                } else {
+                    showProductNotFound(cleanCode);
+                }
             } else {
-                showProductNotFound(code);
+                updateStatus('❌ Código muito curto', 'red');
+                setTimeout(() => {
+                    startCode128Scanner();
+                }, 2000);
             }
         }
 
-        // --- MOSTRAR PRODUTO ENCONTRADO ---
+        // --- MOSTRAR RESULTADO DO PRODUTO ---
         function showProductResult(code, product) {
             document.getElementById('resultCode').textContent = code;
             
             document.getElementById('resultDetails').innerHTML = `
-                <div class="grid grid-cols-2 gap-2">
-                    <div class="font-semibold">Produto:</div>
-                    <div>${product.descricao}</div>
-                    <div class="font-semibold">Marca:</div>
-                    <div>${product.marca}</div>
-                    <div class="font-semibold">Preço:</div>
-                    <div class="text-green-600 font-bold">R$ ${product.preco}</div>
-                    <div class="font-semibold">Estoque:</div>
-                    <div>${product.estoque}</div>
+                <div class="space-y-2">
+                    <div><strong>Produto:</strong> ${product.descricao}</div>
+                    <div><strong>Marca:</strong> ${product.marca}</div>
+                    <div><strong>Preço:</strong> <span class="font-bold">R$ ${product.preco}</span></div>
+                    <div><strong>Estoque:</strong> ${product.estoque}</div>
+                    <div class="text-xs opacity-80 mt-2">✅ CODE 128 VÁLIDO</div>
                 </div>
             `;
             
             document.getElementById('result').classList.remove('hidden');
+            showDebug(`PRODUTO ENCONTRADO: ${product.descricao}`);
         }
 
         // --- PRODUTO NÃO ENCONTRADO ---
@@ -288,58 +358,49 @@
             document.getElementById('resultCode').textContent = code;
             
             document.getElementById('resultDetails').innerHTML = `
-                <div class="text-center text-red-600">
-                    <div class="font-bold">PRODUTO NÃO CADASTRADO</div>
-                    <div class="text-sm mt-1">Código: ${code}</div>
+                <div class="text-center">
+                    <div class="text-red-300 font-bold mb-2">PRODUTO NÃO CADASTRADO</div>
+                    <div class="text-xs">Código: ${code}</div>
+                    <div class="text-xs opacity-80 mt-2">⚠️ Cadastre este produto</div>
                 </div>
             `;
             
             document.getElementById('result').classList.remove('hidden');
+            showDebug(`PRODUTO NÃO CADASTRADO: ${code}`);
         }
 
         // --- FECHAR RESULTADO ---
         function closeResult() {
             document.getElementById('result').classList.add('hidden');
-            
-            // Reinicia o scan
-            if (videoStream) {
-                startManualScan();
-                updateStatus('📷 Escaneando...', 'blue');
-            }
+            // Reinicia o scanner
+            setTimeout(() => {
+                startCode128Scanner();
+            }, 500);
         }
 
-        // --- ADICIONAR AO SISTEMA ---
-        function addToSystem() {
+        // --- ADICIONAR PRODUTO ---
+        function addProduct() {
             const code = document.getElementById('resultCode').textContent;
             updateStatus(`✅ Produto ${code} adicionado!`, 'green');
             closeResult();
         }
 
-        // --- PARAR CÂMERA ---
-        function stopCamera() {
-            if (videoStream) {
-                videoStream.getTracks().forEach(track => track.stop());
-                videoStream = null;
+        // --- PARAR SCANNER ---
+        function stopScanner() {
+            if (isScannerActive) {
+                Quagga.stop();
+                isScannerActive = false;
             }
-            
-            if (scanInterval) {
-                clearInterval(scanInterval);
-                scanInterval = null;
-            }
-            
-            const videoElement = document.getElementById('videoElement');
-            videoElement.srcObject = null;
-            
-            updateStatus('📷 Câmera desligada', 'gray');
-            showDebug(false);
+            updateStatus('📷 Leitor parado', 'gray');
+            showDebug('Scanner parado pelo usuário');
         }
 
-        // --- SIMULAR SCAN (PARA TESTE) ---
-        function simulateScan() {
-            const testCodes = ['1234567', '7654321', '1122334', '9730000'];
+        // --- TESTE CODE 128 ---
+        function testCode128() {
+            const testCodes = ['1234567', '7654321', '1122334', '9730000', '5512378'];
             const randomCode = testCodes[Math.floor(Math.random() * testCodes.length)];
             
-            updateStatus(`🧪 Teste: ${randomCode}`, 'purple');
+            updateStatus(`🧪 Testando Code 128: ${randomCode}`, 'purple');
             processDetectedCode(randomCode);
         }
 
@@ -348,7 +409,7 @@
             const statusElement = document.getElementById('status');
             const colorClass = {
                 blue: 'bg-blue-50 text-blue-700',
-                green: 'bg-green-50 text-green-700', 
+                green: 'bg-green-50 text-green-700',
                 red: 'bg-red-50 text-red-700',
                 gray: 'bg-gray-50 text-gray-700',
                 purple: 'bg-purple-50 text-purple-700'
@@ -358,29 +419,30 @@
             statusElement.innerHTML = `<div class="text-center font-semibold">${message}</div>`;
         }
 
-        // --- DEBUG INFO ---
-        function showDebug(show) {
-            document.getElementById('debugPanel').classList.toggle('hidden', !show);
-        }
-
-        function showDebugInfo(info) {
-            document.getElementById('debugInfo').textContent = info;
+        // --- DEBUG ---
+        function showDebug(message) {
+            const debugPanel = document.getElementById('debugPanel');
+            const debugInfo = document.getElementById('debugInfo');
+            
+            debugPanel.classList.remove('hidden');
+            debugInfo.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
         }
 
         // --- INICIALIZAÇÃO ---
         document.addEventListener('DOMContentLoaded', function() {
-            updateStatus('🔧 Sistema pronto - Clique em "Ligar Câmera"', 'blue');
+            updateStatus('🎯 Leitor Code 128 Carregado', 'blue');
+            showDebug('Sistema pronto - Code 128');
             
-            // Inicia automaticamente após 2 segundos
+            // Inicia automaticamente após 1 segundo
             setTimeout(() => {
-                startCamera();
-            }, 2000);
+                startCode128Scanner();
+            }, 1000);
         });
 
         // Tecla Espaço para teste rápido
         document.addEventListener('keydown', function(e) {
             if (e.code === 'Space') {
-                simulateScan();
+                testCode128();
             }
         });
     </script>
