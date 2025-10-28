@@ -1,9 +1,9 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Solução Câmera - WhatsApp</title>
+    <title>Sistema de Cotação - Câmera Funcionando</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         body {
@@ -38,20 +38,24 @@
             padding: 15px;
             margin: 15px 0;
         }
+        .camera-preview {
+            width: 100%;
+            max-height: 300px;
+            border: 3px solid #10b981;
+            border-radius: 10px;
+            background: #000;
+        }
     </style>
-        <script>
-    // =============================================
-    // DETECTOR GITHUB PAGES + TESTE CÂMERA AUTOMÁTICO
-    // =============================================
+    
+    <!-- DETECTOR GITHUB PAGES + TESTE CÂMERA -->
+    <script>
     function checkGitHubPages() {
         console.log('🔍 Verificando ambiente...');
         
-        // Verifica se está no GitHub Pages
         if (window.location.hostname.includes('github.io')) {
             console.log('✅ GitHub Pages detectado');
             
-            // Atualiza o diagnóstico
-            const diagnosis = document.getElementById('diagnosisResult');
+            const diagnosis = document.getElementById('whatsappDiagnosis');
             if (diagnosis) {
                 diagnosis.innerHTML = `
                     <div class="text-green-700 font-semibold">
@@ -63,7 +67,6 @@
             
             addToLog('🌐 Executando em GitHub Pages - HTTPS ativo');
             
-            // Testa a câmera automaticamente após 3 segundos
             setTimeout(() => {
                 testCameraOnGitHubPages();
             }, 3000);
@@ -86,11 +89,9 @@
             
             addToLog('🎉 CÂMERA FUNCIONANDO PERFEITAMENTE!');
             
-            // Para a câmera após o teste
             stream.getTracks().forEach(track => track.stop());
             
-            // Atualiza interface
-            const diagnosis = document.getElementById('diagnosisResult');
+            const diagnosis = document.getElementById('whatsappDiagnosis');
             if (diagnosis) {
                 diagnosis.innerHTML = `
                     <div class="text-green-700 font-semibold">
@@ -102,13 +103,79 @@
             
         } catch (error) {
             addToLog('❌ Câmera ainda com problema: ' + error.message);
-            console.error('Erro câmera:', error);
         }
     }
 
-    // Função auxiliar para logs (se não existir)
+    // FUNÇÃO IMPORTANTE: TESTE REAL COM CÂMERA
+    async function startRealCameraTest() {
+        addToLog('📷 Iniciando câmera REAL...');
+        
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({
+                video: { 
+                    facingMode: 'environment',
+                    width: { ideal: 1920 },
+                    height: { ideal: 1080 }
+                }
+            });
+            
+            addToLog('🎉 CÂMERA TRASEIRA ATIVA! Pronta para escanear!');
+            
+            // Cria preview da câmera
+            const cameraContainer = document.getElementById('cameraContainer');
+            if (cameraContainer) {
+                cameraContainer.innerHTML = `
+                    <div class="mb-4">
+                        <h3 class="font-semibold text-green-700 mb-2">📸 Câmera Ativa:</h3>
+                        <video id="cameraPreview" class="camera-preview" autoplay playsinline></video>
+                        <div class="flex gap-2 mt-2">
+                            <button onclick="stopCameraTest()" class="flex-1 bg-red-500 hover:bg-red-600 text-white py-2 rounded">
+                                🛑 Parar Câmera
+                            </button>
+                            <button onclick="simulateBarcodeFromCamera()" class="flex-1 bg-blue-500 hover:bg-blue-600 text-white py-2 rounded">
+                                🧪 Simular Leitura
+                            </button>
+                        </div>
+                    </div>
+                `;
+                
+                const videoElement = document.getElementById('cameraPreview');
+                videoElement.srcObject = stream;
+                videoElement.play();
+                
+                // Salva a stream para parar depois
+                window.currentStream = stream;
+            }
+            
+        } catch (error) {
+            addToLog('❌ Erro na câmera: ' + error.message);
+        }
+    }
+
+    function stopCameraTest() {
+        if (window.currentStream) {
+            window.currentStream.getTracks().forEach(track => track.stop());
+            addToLog('📷 Câmera parada');
+            
+            const cameraContainer = document.getElementById('cameraContainer');
+            if (cameraContainer) {
+                cameraContainer.innerHTML = '';
+            }
+        }
+    }
+
+    function simulateBarcodeFromCamera() {
+        addToLog('🔍 Simulando leitura da câmera...');
+        
+        const realCodes = ['123456', '789012', '345678', '112233', '456789'];
+        const randomCode = realCodes[Math.floor(Math.random() * realCodes.length)];
+        
+        addToLog(`📷 Câmera leu código: ${randomCode}`);
+        processScannedCode(randomCode);
+    }
+
     function addToLog(message) {
-        const log = document.getElementById('permissionLog') || document.getElementById('systemLog');
+        const log = document.getElementById('systemLog');
         if (log) {
             log.innerHTML += `<div>> ${new Date().toLocaleTimeString()} - ${message}</div>`;
             log.scrollTop = log.scrollHeight;
@@ -117,97 +184,42 @@
     }
     </script>
 </head>
+
 <body class="flex items-center justify-center p-4">
     <div class="card w-full max-w-2xl p-6">
-        <!-- Alerta Urgente -->
-        <div class="urgent-alert">
-            <div class="flex items-center mb-2">
-                <span class="text-2xl mr-2">🚨</span>
-                <h2 class="text-lg font-bold text-red-800">PROBLEMA IDENTIFICADO</h2>
-            </div>
-            <p class="text-red-700 text-sm">
-                <strong>Você está abrindo do WhatsApp → Arquivo local → Câmera bloqueada</strong>
-            </p>
+        <!-- Cabeçalho Atualizado -->
+        <div class="text-center mb-6">
+            <h1 class="text-2xl font-bold text-gray-800 mb-2">
+                🎯 Sistema de Cotação
+            </h1>
+            <p class="text-gray-600">Câmera funcionando no GitHub Pages!</p>
         </div>
 
-        <h1 class="text-2xl font-bold text-gray-800 mb-2 text-center">
-            🔧 Solução Definitiva
-        </h1>
-        <p class="text-gray-600 text-center mb-6">Para funcionar quando aberto do WhatsApp</p>
-
-        <!-- Diagnóstico Específico -->
-        <div class="bg-blue-50 p-4 rounded-lg mb-6">
-            <h3 class="font-semibold text-blue-800 mb-2">🔍 Diagnóstico WhatsApp:</h3>
-            <div id="whatsappDiagnosis" class="text-sm text-blue-700">
-                Analisando seu contexto...
-            </div>
-        </div>
-
-        <!-- SOLUÇÕES EM ORDEM DE PRIORIDADE -->
-        <div class="mb-6">
-            <h3 class="font-semibold text-gray-700 mb-3">🎯 SOLUÇÕES (Do Mais Fácil ao Mais Eficaz):</h3>
-            
-            <!-- Solução 1: Copiar Link -->
-            <div class="permission-guide">
-                <h4 class="font-bold text-yellow-800 mb-2">1️⃣ SOLUÇÃO RÁPIDA (Recomendada):</h4>
-                <button onclick="copyDeployLink()" class="w-full bg-green-500 hover:bg-green-600 text-white font-semibold py-3 rounded-lg transition duration-200 mb-2">
-                    📋 COPIAR LINK PARA DEPLOY
-                </button>
-                <p class="text-sm text-yellow-800">Use serviços gratuitos para hospedar online</p>
-            </div>
-
-            <!-- Solução 2: Abrir no Chrome -->
-            <div class="permission-guide mt-4">
-                <h4 class="font-bold text-yellow-800 mb-2">2️⃣ SOLUÇÃO INTERMEDIÁRIA:</h4>
-                <button onclick="openInChrome()" class="w-full bg-blue-500 hover:bg-blue-600 text-white font-semibold py-3 rounded-lg transition duration-200 mb-2">
-                    🌐 ABRIR NO CHROME
-                </button>
-                <p class="text-sm text-yellow-800">Força a abertura no navegador padrão</p>
-            </div>
-
-            <!-- Solução 3: Manual -->
-            <div class="permission-guide mt-4">
-                <h4 class="font-bold text-yellow-800 mb-2">3️⃣ SOLUÇÃO MANUAL:</h4>
-                <div class="text-sm text-yellow-800 space-y-2">
-                    <p><strong>Passo a passo:</strong></p>
-                    <ol class="list-decimal list-inside space-y-1">
-                        <li>Toque nos <strong>3 pontos</strong> no Chrome</li>
-                        <li><strong>"Abrir no Chrome"</strong> (se disponível)</li>
-                        <li>Ou salve o arquivo e abra manualmente</li>
-                        <li>Configure permissões de câmera</li>
-                    </ol>
-                </div>
-            </div>
-        </div>
-
-        <!-- SERVIÇOS DE DEPLOY GRATUITOS -->
-        <div class="bg-purple-50 p-4 rounded-lg mb-6">
-            <h3 class="font-semibold text-purple-800 mb-3">🚀 Hospedagem Gratuita (5 minutos):</h3>
-            <div class="grid grid-cols-1 gap-2 text-sm">
-                <div class="flex items-center p-2 bg-white rounded border">
-                    <span class="mr-2">📁</span>
-                    <span><strong>Netlify Drop:</strong> Arraste o arquivo HTML</span>
-                </div>
-                <div class="flex items-center p-2 bg-white rounded border">
-                    <span class="mr-2">⚡</span>
-                    <span><strong>Vercel:</strong> Upload direto</span>
-                </div>
-                <div class="flex items-center p-2 bg-white rounded border">
-                    <span class="mr-2">🌐</span>
-                    <span><strong>GitHub Pages:</strong> Para versão final</span>
-                </div>
-            </div>
-            <button onclick="showDeployTutorial()" class="w-full mt-3 bg-purple-500 hover:bg-purple-600 text-white font-semibold py-2 rounded transition duration-200">
-                📖 Ver Tutorial Completo
-            </button>
-        </div>
-
-        <!-- TESTE SIMULADO (Funciona Sempre) -->
+        <!-- Status da Câmera -->
         <div class="bg-green-50 p-4 rounded-lg mb-6">
-            <h3 class="font-semibold text-green-800 mb-2">🧪 Teste Imediato (Simulação):</h3>
-            <p class="text-sm text-green-700 mb-3">Teste o sistema enquanto resolve a hospedagem:</p>
-            <button onclick="startAdvancedSimulation()" class="w-full bg-green-500 hover:bg-green-600 text-white font-semibold py-3 rounded-lg transition duration-200">
-                🎯 Testar com Códigos Reais
+            <h3 class="font-semibold text-green-800 mb-2">✅ Status da Câmera:</h3>
+            <div id="whatsappDiagnosis" class="text-sm text-green-700">
+                Verificando...
+            </div>
+        </div>
+
+        <!-- Container da Câmera -->
+        <div id="cameraContainer" class="mb-6">
+            <!-- A câmera aparecerá aqui quando iniciada -->
+        </div>
+
+        <!-- Botões de Ação -->
+        <div class="grid grid-cols-1 gap-4 mb-6">
+            <button onclick="startRealCameraTest()" class="w-full bg-green-500 hover:bg-green-600 text-white font-semibold py-4 rounded-lg transition duration-200 text-lg">
+                📷 Iniciar Câmera Real
+            </button>
+            
+            <button onclick="startAdvancedSimulation()" class="w-full bg-blue-500 hover:bg-blue-600 text-white font-semibold py-4 rounded-lg transition duration-200 text-lg">
+                🧪 Teste com Simulação
+            </button>
+
+            <button onclick="stopCameraTest()" class="w-full bg-red-500 hover:bg-red-600 text-white font-semibold py-3 rounded-lg transition duration-200">
+                🛑 Parar Câmera
             </button>
         </div>
 
@@ -222,40 +234,17 @@
                    readonly>
         </div>
 
+        <!-- Informações do Produto -->
+        <div id="productInfo" class="bg-yellow-50 p-4 rounded-lg mb-6 hidden">
+            <!-- Informações do produto aparecerão aqui -->
+        </div>
+
         <!-- Log de Atividades -->
         <div>
             <h3 class="font-semibold text-gray-700 mb-2">📝 Log do Sistema:</h3>
             <div id="systemLog" class="bg-gray-800 text-green-400 p-3 rounded font-mono text-sm max-h-32 overflow-y-auto">
-                <div>> Sistema otimizado para WhatsApp carregado</div>
+                <div>> Sistema carregado. Clique em "Iniciar Câmera Real"</div>
             </div>
-        </div>
-    </div>
-
-    <!-- Modal de Tutorial -->
-    <div id="tutorialModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center p-4 z-50">
-        <div class="bg-white rounded-lg p-6 max-w-md w-full">
-            <h3 class="text-xl font-bold mb-4">🚀 Tutorial: Hospedagem Rápida</h3>
-            <div class="space-y-3 text-sm">
-                <div class="flex items-start">
-                    <span class="bg-blue-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs mr-2 flex-shrink-0">1</span>
-                    <span>Acesse <strong>netlify.com/drop</strong></span>
-                </div>
-                <div class="flex items-start">
-                    <span class="bg-green-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs mr-2 flex-shrink-0">2</span>
-                    <span>Arraste seu arquivo HTML para a área</span>
-                </div>
-                <div class="flex items-start">
-                    <span class="bg-purple-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs mr-2 flex-shrink-0">3</span>
-                    <span>Pronto! Você terá uma URL HTTPS</span>
-                </div>
-                <div class="flex items-start">
-                    <span class="bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs mr-2 flex-shrink-0">4</span>
-                    <span>Compartilhe essa URL no WhatsApp</span>
-                </div>
-            </div>
-            <button onclick="closeTutorial()" class="w-full mt-4 bg-gray-500 hover:bg-gray-600 text-white py-2 rounded">
-                Fechar
-            </button>
         </div>
     </div>
 
@@ -269,100 +258,6 @@
             { codigo: '456789', descricao: 'WEBCAM 1080P PROFISSIONAL', vlUnit: '159.90', unidade: 'UN' }
         ];
 
-        // --- DIAGNÓSTICO WHATSAPP ---
-        function diagnoseWhatsAppContext() {
-            addToLog('🔍 Analisando contexto WhatsApp...');
-            
-            const diagnosis = document.getElementById('whatsappDiagnosis');
-            let issues = [];
-            
-            // Verifica se é file://
-            if (window.location.protocol === 'file:') {
-                issues.push('❌ Arquivo local (file://) - Câmera BLOQUEADA');
-                issues.push('❌ HTTPS necessário para câmera');
-                issues.push('✅ Problema identificado corretamente');
-            }
-            
-            // Verifica user agent do WhatsApp
-            const userAgent = navigator.userAgent.toLowerCase();
-            if (userAgent.includes('whatsapp')) {
-                issues.push('⚠️ Detectado via WhatsApp');
-            }
-            
-            if (issues.length > 0) {
-                diagnosis.innerHTML = `
-                    <div class="text-red-700">
-                        <strong>Problemas encontrados:</strong>
-                        <ul class="list-disc list-inside mt-1">
-                            ${issues.map(issue => `<li>${issue}</li>`).join('')}
-                        </ul>
-                        <p class="mt-2 font-semibold">🎯 Use as soluções abaixo</p>
-                    </div>
-                `;
-            }
-            
-            addToLog('✅ Diagnóstico completo');
-        }
-
-        // --- SOLUÇÃO 1: COPIAR LINK DEPLOY ---
-        function copyDeployLink() {
-            addToLog('📋 Preparando link para deploy...');
-            
-            const deployText = `🚀 HOSPEDAGEM GRATUITA para sua aplicação:
-
-1️⃣ Netlify Drop: netlify.com/drop
-2️⃣ Vercel: vercel.com/new
-3️⃣ GitHub Pages: pages.github.com
-
-📁 Arraste seu arquivo HTML e tenha uma URL HTTPS em 2 minutos!
-
-💡 Isso resolverá o problema da câmera!`;
-            
-            // Tenta usar a Clipboard API
-            if (navigator.clipboard && navigator.clipboard.writeText) {
-                navigator.clipboard.writeText(deployText)
-                    .then(() => {
-                        addToLog('✅ Link copiado! Cole no seu navegador');
-                        alert('📋 Link copiado! Agora cole no seu navegador para fazer o deploy.');
-                    })
-                    .catch(err => {
-                        fallbackCopy(deployText);
-                    });
-            } else {
-                fallbackCopy(deployText);
-            }
-        }
-
-        function fallbackCopy(text) {
-            const textArea = document.createElement('textarea');
-            textArea.value = text;
-            document.body.appendChild(textArea);
-            textArea.select();
-            document.execCommand('copy');
-            document.body.removeChild(textArea);
-            addToLog('✅ Link copiado (método alternativo)');
-            alert('📋 Link copiado! Cole no seu navegador.');
-        }
-
-        // --- SOLUÇÃO 2: ABRIR NO CHROME ---
-        function openInChrome() {
-            addToLog('🌐 Tentando abrir no Chrome...');
-            
-            // Tenta detectar se está no WebView do WhatsApp
-            if (navigator.userAgent.includes('WhatsApp')) {
-                addToLog('⚠️ No WebView do WhatsApp. Use a Solução 1 (Deploy)');
-                alert('📱 Para melhor experiência, use a Solução 1 (Deploy Online)');
-                return;
-            }
-            
-            // Tenta redirecionar para intent do Android
-            const currentUrl = window.location.href;
-            const chromeIntent = `intent://${currentUrl.replace('file://', '')}#Intent;scheme=file;package=com.android.chrome;end`;
-            
-            addToLog('🔧 Use a Solução 1 para resultado garantido');
-            alert('🌐 Para funcionar 100%, use a Solução 1 (Deploy Online)');
-        }
-
         // --- SIMULAÇÃO AVANÇADA ---
         function startAdvancedSimulation() {
             addToLog('🎯 Iniciando simulação realista...');
@@ -375,7 +270,6 @@
                     const code = realCodes[codeIndex];
                     addToLog(`📷 Simulando leitura: ${code}`);
                     
-                    // Animação de escaneamento
                     document.getElementById('testCodeResult').value = 'Escaneando...';
                     document.getElementById('testCodeResult').classList.add('border-yellow-500', 'bg-yellow-50', 'animate-pulse');
                     
@@ -401,13 +295,26 @@
             document.getElementById('testCodeResult').classList.add('border-green-500', 'bg-green-50');
             
             const product = productDatabase.find(p => p.codigo === code);
+            const productInfo = document.getElementById('productInfo');
+            
             if (product) {
                 addToLog(`✅ ${product.descricao} - R$ ${product.vlUnit}`);
                 
-                // Feedback visual adicional
+                // Mostra informações do produto
+                productInfo.classList.remove('hidden');
+                productInfo.innerHTML = `
+                    <h4 class="font-semibold text-green-800 mb-2">✅ Produto Encontrado:</h4>
+                    <div class="text-sm">
+                        <p><strong>Descrição:</strong> ${product.descricao}</p>
+                        <p><strong>Preço:</strong> R$ ${product.vlUnit}</p>
+                        <p><strong>Unidade:</strong> ${product.unidade}</p>
+                    </div>
+                `;
+                
                 showProductToast(product);
             } else {
                 addToLog(`❌ Código ${code} não encontrado`);
+                productInfo.classList.add('hidden');
             }
         }
 
@@ -428,82 +335,43 @@
             }, 3000);
         }
 
-        // --- TUTORIAL MODAL ---
-        function showDeployTutorial() {
-            document.getElementById('tutorialModal').classList.remove('hidden');
-            document.getElementById('tutorialModal').classList.add('flex');
-            addToLog('📖 Abrindo tutorial de deploy');
-        }
-
-        function closeTutorial() {
-            document.getElementById('tutorialModal').classList.add('hidden');
-            document.getElementById('tutorialModal').classList.remove('flex');
-        }
-
-        // --- FUNÇÕES AUXILIARES ---
-        function addToLog(message) {
-            const log = document.getElementById('systemLog');
-            log.innerHTML += `<div>> ${new Date().toLocaleTimeString()} - ${message}</div>`;
-            log.scrollTop = log.scrollHeight;
-        }
-
         // --- INICIALIZAÇÃO ---
-        window.onload = function() {
-            addToLog('Sistema otimizado para WhatsApp carregado');
-            diagnoseWhatsAppContext();
+        document.addEventListener('DOMContentLoaded', function() {
+            addToLog('🚀 Sistema de cotação carregado');
             
-            // Detecta se está em file://
-            if (window.location.protocol === 'file:') {
-                addToLog('🚨 MODO LOCAL DETECTADO - Câmera não funcionará');
-            }
-        };
-
-        // Fecha modal clicando fora
-        document.getElementById('tutorialModal').addEventListener('click', function(e) {
-            if (e.target === this) closeTutorial();
+            // Verifica se está no GitHub Pages
+            setTimeout(() => {
+                checkGitHubPages();
+            }, 1000);
+            
+            // Adiciona botão flutuante
+            addQuickTestButton();
         });
+        
+        function addQuickTestButton() {
+            const existingButton = document.querySelector('#quickTestBtn');
+            if (!existingButton) {
+                const testBtn = document.createElement('button');
+                testBtn.id = 'quickTestBtn';
+                testBtn.textContent = '🚀 Testar Câmera';
+                testBtn.style.cssText = `
+                    position: fixed;
+                    bottom: 20px;
+                    right: 20px;
+                    background: #10b981;
+                    color: white;
+                    border: none;
+                    padding: 12px 16px;
+                    border-radius: 8px;
+                    font-size: 14px;
+                    cursor: pointer;
+                    z-index: 1000;
+                    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+                `;
+                testBtn.onclick = startRealCameraTest;
+                document.body.appendChild(testBtn);
+            }
+        }
     </script>
 </body>
-<script>
-    // =============================================
-    // INICIALIZADOR AUTOMÁTICO
-    // =============================================
-    document.addEventListener('DOMContentLoaded', function() {
-        console.log('🚀 Iniciando sistema GitHub Pages...');
-        
-        // Aguarda 1 segundo e verifica o ambiente
-        setTimeout(() => {
-            checkGitHubPages();
-        }, 1000);
-        
-        // Adiciona botão de teste rápido se não existir
-        addQuickTestButton();
-    });
-    
-    function addQuickTestButton() {
-        // Adiciona um botão de teste rápido se necessário
-        const existingButton = document.querySelector('#quickTestBtn');
-        if (!existingButton) {
-            const testBtn = document.createElement('button');
-            testBtn.id = 'quickTestBtn';
-            testBtn.textContent = '🚀 Testar Câmera Agora';
-            testBtn.style.cssText = `
-                position: fixed;
-                bottom: 20px;
-                right: 20px;
-                background: #10b981;
-                color: white;
-                border: none;
-                padding: 12px 16px;
-                border-radius: 8px;
-                font-size: 14px;
-                cursor: pointer;
-                z-index: 1000;
-                box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-            `;
-            testBtn.onclick = testCameraOnGitHubPages;
-            document.body.appendChild(testBtn);
-        }
-    }
-    </script>
 </html>
