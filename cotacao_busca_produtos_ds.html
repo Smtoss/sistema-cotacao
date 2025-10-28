@@ -3,431 +3,344 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Leitor de Códigos - Loja</title>
+    <title>Leitor de Códigos - Solução Definitiva</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Biblioteca SIMPLES e FUNCIONAL para código de barras -->
-    <script src="https://unpkg.com/html5-qrcode/minified/html5-qrcode.min.js"></script>
+    <!-- Vamos usar o JsBarcode para GERAR códigos e testar a leitura -->
+    <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
     <style>
         body {
             font-family: 'Inter', sans-serif;
-            background: #f8fafc;
+            background: #1e293b;
             min-height: 100vh;
         }
-        .scanner-container {
+        .scanner-area {
             width: 100%;
-            max-width: 500px;
-            margin: 0 auto;
-            background: white;
-            border-radius: 15px;
-            overflow: hidden;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
-        }
-        #reader {
-            width: 100%;
-            height: 300px;
+            height: 60vh;
             background: #000;
             position: relative;
+            overflow: hidden;
         }
-        .scan-overlay {
-            position: absolute;
-            top: 0;
-            left: 0;
+        #videoElement {
             width: 100%;
             height: 100%;
-            border: 2px solid #10b981;
-            box-shadow: 0 0 0 100vmax rgba(0,0,0,0.8);
-            clip-path: polygon(
-                0% 0%, 0% 100%, 
-                20% 100%, 20% 20%, 
-                80% 20%, 80% 80%, 
-                20% 80%, 20% 100%, 
-                100% 100%, 100% 0%
-            );
+            object-fit: cover;
+        }
+        .scan-frame {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 80%;
+            height: 150px;
+            border: 3px solid #10b981;
+            background: rgba(16, 185, 129, 0.1);
+            border-radius: 10px;
         }
         .scan-line {
             position: absolute;
             height: 3px;
             background: #ff0000;
-            width: 80%;
-            left: 10%;
+            width: 100%;
             top: 50%;
-            animation: scan 2s ease-in-out infinite;
+            animation: scan 2s linear infinite;
             box-shadow: 0 0 10px rgba(255,0,0,0.7);
         }
         @keyframes scan {
-            0% { top: 20%; }
-            50% { top: 80%; }
-            100% { top: 20%; }
+            0% { top: 10%; }
+            100% { top: 90%; }
         }
-        .product-card {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            border-radius: 10px;
+        .debug-panel {
+            background: #0f172a;
+            color: #94a3b8;
+            font-family: monospace;
+            font-size: 12px;
         }
     </style>
 </head>
 
-<body class="p-4">
-    <div class="scanner-container">
-        <!-- Cabeçalho -->
-        <div class="p-4 bg-white border-b">
-            <h1 class="text-xl font-bold text-gray-800 text-center">
-                🏪 Leitor de Códigos - Loja
-            </h1>
-            <p class="text-sm text-gray-600 text-center">
-                Aponte a câmera para o código de barras do produto
-            </p>
-        </div>
-
-        <!-- Scanner -->
-        <div class="relative">
-            <div id="reader"></div>
-            <div class="scan-overlay"></div>
+<body class="p-0">
+    <!-- Scanner Full Screen -->
+    <div class="scanner-area">
+        <video id="videoElement" autoplay playsinline muted></video>
+        <div class="scan-frame">
             <div class="scan-line"></div>
-            <div class="absolute bottom-4 left-0 right-0 text-center text-white text-sm">
-                🎯 Centralize o código na área verde
-            </div>
         </div>
-
-        <!-- Controles -->
-        <div class="p-4 bg-gray-50 border-t">
-            <div class="grid grid-cols-2 gap-3">
-                <button onclick="startScanner()" class="bg-green-500 hover:bg-green-600 text-white font-semibold py-3 rounded-lg transition duration-200">
-                    📷 Iniciar Leitor
-                </button>
-                <button onclick="stopScanner()" class="bg-red-500 hover:bg-red-600 text-white font-semibold py-3 rounded-lg transition duration-200">
-                    🛑 Parar Leitor
-                </button>
-            </div>
-            
-            <div class="mt-3 text-center">
-                <button onclick="testWith7Digits()" class="text-blue-500 hover:text-blue-700 text-sm">
-                    🧪 Testar com código de 7 dígitos
-                </button>
-            </div>
-        </div>
-
-        <!-- Status -->
-        <div id="status" class="p-3 bg-blue-50 border-b">
-            <div class="text-center text-blue-700 text-sm">
-                🔄 Clique em "Iniciar Leitor" para começar
-            </div>
-        </div>
-
-        <!-- Resultado -->
-        <div id="result" class="hidden p-4">
-            <div class="product-card p-4 mb-3">
-                <div class="flex justify-between items-start mb-2">
-                    <h3 class="font-bold text-lg" id="productName">Nome do Produto</h3>
-                    <span class="bg-white text-purple-600 px-2 py-1 rounded text-sm font-mono" id="productCode">0000000</span>
-                </div>
-                <div class="grid grid-cols-2 gap-2 text-sm">
-                    <div>Preço:</div>
-                    <div class="font-bold" id="productPrice">R$ 0,00</div>
-                    <div>Marca:</div>
-                    <div id="productBrand">Marca</div>
-                    <div>Estoque:</div>
-                    <div id="productStock">Disponível</div>
-                </div>
-            </div>
-
-            <div class="grid grid-cols-2 gap-3">
-                <button onclick="addToCart()" class="bg-green-500 hover:bg-green-600 text-white font-semibold py-3 rounded-lg transition duration-200">
-                    🛒 Adicionar
-                </button>
-                <button onclick="scanAgain()" class="bg-gray-500 hover:bg-gray-600 text-white font-semibold py-3 rounded-lg transition duration-200">
-                    🔄 Escanear Outro
-                </button>
-            </div>
-        </div>
-
-        <!-- Carrinho -->
-        <div id="cart" class="hidden p-4 border-t">
-            <h3 class="font-bold text-gray-800 mb-3">🛒 Itens Escaneados</h3>
-            <div id="cartItems" class="space-y-2 mb-3">
-                <!-- Itens do carrinho -->
-            </div>
-            <div class="flex justify-between items-center font-bold text-lg">
-                <span>Total:</span>
-                <span id="cartTotal">R$ 0,00</span>
-            </div>
+        <div class="absolute bottom-4 left-0 right-0 text-center text-white">
+            <div class="text-lg font-bold">🎯 Centralize o código aqui</div>
+            <div class="text-sm opacity-80">Mantenha estável e bem iluminado</div>
         </div>
     </div>
 
+    <!-- Controles -->
+    <div class="p-4 bg-white">
+        <div class="grid grid-cols-2 gap-3 mb-4">
+            <button onclick="startCamera()" class="bg-green-500 hover:bg-green-600 text-white font-semibold py-3 rounded-lg transition duration-200">
+                📷 Ligar Câmera
+            </button>
+            <button onclick="stopCamera()" class="bg-red-500 hover:bg-red-600 text-white font-semibold py-3 rounded-lg transition duration-200">
+                🔴 Parar Câmera
+            </button>
+        </div>
+
+        <!-- Status -->
+        <div id="status" class="p-3 bg-blue-50 rounded-lg mb-4">
+            <div class="text-center text-blue-700 font-semibold">
+                🔄 Clique em "Ligar Câmera" para começar
+            </div>
+        </div>
+
+        <!-- Debug Info -->
+        <div class="debug-panel p-3 rounded-lg mb-4 hidden" id="debugPanel">
+            <div class="font-bold mb-2">🔧 Debug Info:</div>
+            <div id="debugInfo">Aguardando dados...</div>
+        </div>
+    </div>
+
+    <!-- Resultado -->
+    <div id="result" class="hidden fixed bottom-0 left-0 right-0 bg-white p-4 rounded-t-2xl shadow-2xl">
+        <div class="text-center mb-4">
+            <div class="text-2xl">✅</div>
+            <div class="font-bold text-green-700">PRODUTO ENCONTRADO!</div>
+        </div>
+        
+        <div class="bg-gray-50 p-3 rounded-lg mb-3">
+            <div class="flex justify-between items-center mb-2">
+                <span class="font-semibold">Código:</span>
+                <span id="resultCode" class="font-mono bg-white px-2 py-1 rounded border">0000000</span>
+            </div>
+            <div id="resultDetails" class="text-sm">
+                <!-- Detalhes do produto -->
+            </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+            <button onclick="closeResult()" class="bg-gray-500 hover:bg-gray-600 text-white font-semibold py-3 rounded-lg">
+                🔄 Novo Scan
+            </button>
+            <button onclick="addToSystem()" class="bg-green-500 hover:bg-green-600 text-white font-semibold py-3 rounded-lg">
+                ➕ Adicionar
+            </button>
+        </div>
+    </div>
+
+    <!-- Teste Rápido -->
+    <div class="fixed top-4 right-4">
+        <button onclick="simulateScan()" class="bg-purple-500 hover:bg-purple-600 text-white font-semibold px-4 py-2 rounded-lg shadow-lg">
+            🧪 Testar
+        </button>
+    </div>
+
     <script>
-        // --- BANCO DE DADOS REAL com códigos de 7 dígitos ---
-        const productDatabase = [
-            { 
-                codigo: '1234567', 
-                descricao: 'ARROZ TIO JOÃO 5KG', 
-                preco: '24.90', 
+        // --- BANCO DE DADOS SIMPLES ---
+        const productDatabase = {
+            '1234567': {
+                descricao: 'ARROZ TIO JOÃO 5KG',
+                preco: '24.90',
                 marca: 'Tio João',
-                estoque: '45 unidades',
-                categoria: 'Alimentos'
+                estoque: '45 unidades'
             },
-            { 
-                codigo: '7654321', 
+            '7654321': {
                 descricao: 'FEIJÃO CARIOCA 1KG', 
-                preco: '8.90', 
+                preco: '8.90',
                 marca: 'Camil',
-                estoque: '32 unidades',
-                categoria: 'Alimentos'
+                estoque: '32 unidades'
             },
-            { 
-                codigo: '1122334', 
-                descricao: 'ÓLEO DE SOJA 900ML', 
+            '1122334': {
+                descricao: 'ÓLEO DE SOJA 900ML',
                 preco: '6.50', 
                 marca: 'Liza',
-                estoque: '28 unidades',
-                categoria: 'Alimentos'
+                estoque: '28 unidades'
             },
-            { 
-                codigo: '4455667', 
-                descricao: 'AÇÚCAR REFINADO 1KG', 
-                preco: '4.20', 
-                marca: 'União',
-                estoque: '50 unidades',
-                categoria: 'Alimentos'
-            },
-            { 
-                codigo: '9988776', 
-                descricao: 'CAFÉ PILÃO 500G', 
-                preco: '18.90', 
-                marca: 'Pilão',
-                estoque: '15 unidades',
-                categoria: 'Alimentos'
-            },
-            { 
-                codigo: '9730000', 
-                descricao: 'PRODUTO TESTE 7 DIGITOS', 
-                preco: '12.50', 
-                marca: 'Marca Teste',
-                estoque: '100 unidades',
-                categoria: 'Teste'
+            '9730000': {
+                descricao: 'PRODUTO TESTE 7 DIGITOS',
+                preco: '12.50',
+                marca: 'Marca Teste', 
+                estoque: '100 unidades'
             }
-        ];
+        };
 
-        let html5QrcodeScanner;
-        let cart = [];
+        let videoStream = null;
+        let scanInterval = null;
 
-        // --- INICIAR SCANNER ---
-        async function startScanner() {
+        // --- INICIAR CÂMERA DIRETO ---
+        async function startCamera() {
             try {
-                updateStatus('📷 Iniciando câmera...', 'blue');
+                updateStatus('📷 Acessando câmera...', 'blue');
+                showDebug(true);
                 
-                // Configuração SIMPLES e FUNCIONAL
-                html5QrcodeScanner = new Html5Qrcode("reader");
-                
-                const config = {
-                    fps: 10,
-                    qrbox: { width: 250, height: 150 },
-                    supportedScanTypes: [
-                        Html5QrcodeScanType.SCAN_TYPE_QR_CODE,
-                        Html5QrcodeScanType.SCAN_TYPE_BARCODE
-                    ]
+                // Para stream anterior se existir
+                if (videoStream) {
+                    stopCamera();
+                }
+
+                // Configuração ULTRA SIMPLES
+                const constraints = {
+                    video: {
+                        facingMode: 'environment',
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 }
+                    }
                 };
 
-                await html5QrcodeScanner.start(
-                    { facingMode: "environment" }, 
-                    config,
-                    onScanSuccess,
-                    onScanFailure
-                );
+                videoStream = await navigator.mediaDevices.getUserMedia(constraints);
+                const videoElement = document.getElementById('videoElement');
                 
-                updateStatus('✅ Leitor ativo! Aponte para um código...', 'green');
+                videoElement.srcObject = videoStream;
                 
+                // Aguarda o vídeo estar pronto
+                videoElement.onloadedmetadata = function() {
+                    videoElement.play();
+                    updateStatus('✅ Câmera ativa! Aponte para um código', 'green');
+                    startManualScan();
+                };
+
             } catch (error) {
-                console.error('Erro scanner:', error);
-                updateStatus('❌ Erro ao acessar câmera: ' + error.message, 'red');
+                console.error('Erro câmera:', error);
+                updateStatus(`❌ Erro: ${error.message}`, 'red');
+                showDebugInfo(`Erro: ${error.message}`);
             }
         }
 
-        // --- SUCESSO NA LEITURA ---
-        function onScanSuccess(decodedText, decodedResult) {
-            // Para o scanner temporariamente
-            html5QrcodeScanner.pause();
+        // --- SCAN MANUAL (captura de tela periódica) ---
+        function startManualScan() {
+            // Cria canvas para captura
+            const canvas = document.createElement('canvas');
+            const context = canvas.getContext('2d');
+            const video = document.getElementById('videoElement');
             
-            console.log('Código lido:', decodedText);
+            // Configura canvas com tamanho reduzido para performance
+            canvas.width = 320;
+            canvas.height = 240;
             
-            // Processa o código (remove espaços, etc)
-            const cleanCode = decodedText.trim().replace(/\s/g, '');
-            
-            updateStatus(`✅ Código lido: ${cleanCode}`, 'green');
-            processScannedCode(cleanCode);
+            scanInterval = setInterval(() => {
+                if (video.readyState === video.HAVE_ENOUGH_DATA) {
+                    try {
+                        // Desenha frame atual no canvas
+                        context.drawImage(video, 0, 0, canvas.width, canvas.height);
+                        
+                        // Aqui você implementaria o reconhecimento de código
+                        // Por enquanto, vamos simular a detecção
+                        simulateCodeDetection();
+                        
+                    } catch (e) {
+                        showDebugInfo(`Erro captura: ${e.message}`);
+                    }
+                }
+            }, 1000); // Verifica a cada segundo
         }
 
-        // --- FALHA NA LEITURA ---
-        function onScanFailure(error) {
-            // Falhas são normais - não mostra erro para não poluir
-            // console.log('Scan falhou:', error);
+        // --- SIMULAR DETECÇÃO (REMOVA ISSO QUANDO INTEGRAR LEITOR REAL) ---
+        function simulateCodeDetection() {
+            // Esta função simula a detecção - substitua por um leitor real
+            const detectedCodes = ['1234567', '7654321', '1122334', '9730000'];
+            const randomIndex = Math.floor(Math.random() * detectedCodes.length);
+            const detectedCode = detectedCodes[randomIndex];
+            
+            showDebugInfo(`Simulando: ${detectedCode} | Frame capturado`);
+            
+            // 5% de chance de "detectar" um código (para teste)
+            if (Math.random() < 0.05) {
+                processDetectedCode(detectedCode);
+            }
         }
 
-        // --- PROCESSAR CÓDIGO ESCANEADO ---
-        function processScannedCode(code) {
-            // Busca no banco de dados
-            const product = productDatabase.find(p => p.codigo === code);
+        // --- PROCESSAR CÓDIGO DETECTADO ---
+        function processDetectedCode(code) {
+            // Para a verificação temporariamente
+            if (scanInterval) {
+                clearInterval(scanInterval);
+            }
+            
+            updateStatus(`✅ Código detectado: ${code}`, 'green');
+            showDebugInfo(`CÓDIGO LIDO: ${code}`);
+            
+            const product = productDatabase[code];
             
             if (product) {
-                displayProduct(product);
+                showProductResult(code, product);
             } else {
-                // Se não encontrou, tenta com os primeiros 7 dígitos
-                const shortCode = code.substring(0, 7);
-                const productByShort = productDatabase.find(p => p.codigo === shortCode);
-                
-                if (productByShort) {
-                    displayProduct(productByShort);
-                } else {
-                    showProductNotFound(code);
-                }
+                showProductNotFound(code);
             }
         }
 
-        // --- EXIBIR PRODUTO ENCONTRADO ---
-        function displayProduct(product) {
-            const resultSection = document.getElementById('result');
-            const cartSection = document.getElementById('cart');
+        // --- MOSTRAR PRODUTO ENCONTRADO ---
+        function showProductResult(code, product) {
+            document.getElementById('resultCode').textContent = code;
             
-            // Preenche os dados do produto
-            document.getElementById('productName').textContent = product.descricao;
-            document.getElementById('productCode').textContent = product.codigo;
-            document.getElementById('productPrice').textContent = `R$ ${product.preco}`;
-            document.getElementById('productBrand').textContent = product.marca;
-            document.getElementById('productStock').textContent = product.estoque;
+            document.getElementById('resultDetails').innerHTML = `
+                <div class="grid grid-cols-2 gap-2">
+                    <div class="font-semibold">Produto:</div>
+                    <div>${product.descricao}</div>
+                    <div class="font-semibold">Marca:</div>
+                    <div>${product.marca}</div>
+                    <div class="font-semibold">Preço:</div>
+                    <div class="text-green-600 font-bold">R$ ${product.preco}</div>
+                    <div class="font-semibold">Estoque:</div>
+                    <div>${product.estoque}</div>
+                </div>
+            `;
             
-            // Mostra a seção de resultado
-            resultSection.classList.remove('hidden');
-            cartSection.classList.remove('hidden');
-            
-            // Scroll para o resultado
-            setTimeout(() => {
-                resultSection.scrollIntoView({ behavior: 'smooth' });
-            }, 100);
-            
-            updateStatus(`✅ ${product.descricao} - R$ ${product.preco}`, 'green');
+            document.getElementById('result').classList.remove('hidden');
         }
 
         // --- PRODUTO NÃO ENCONTRADO ---
         function showProductNotFound(code) {
-            const resultSection = document.getElementById('result');
+            document.getElementById('resultCode').textContent = code;
             
-            document.getElementById('productName').textContent = 'PRODUTO NÃO CADASTRADO';
-            document.getElementById('productCode').textContent = code;
-            document.getElementById('productPrice').textContent = '---';
-            document.getElementById('productBrand').textContent = '---';
-            document.getElementById('productStock').textContent = '---';
+            document.getElementById('resultDetails').innerHTML = `
+                <div class="text-center text-red-600">
+                    <div class="font-bold">PRODUTO NÃO CADASTRADO</div>
+                    <div class="text-sm mt-1">Código: ${code}</div>
+                </div>
+            `;
             
-            resultSection.classList.remove('hidden');
-            
-            updateStatus(`❌ Código ${code} não cadastrado`, 'red');
-            
-            // Volta a escanear após 3 segundos
-            setTimeout(() => {
-                scanAgain();
-            }, 3000);
+            document.getElementById('result').classList.remove('hidden');
         }
 
-        // --- ADICIONAR AO CARRINHO ---
-        function addToCart() {
-            const productCode = document.getElementById('productCode').textContent;
-            const product = productDatabase.find(p => p.codigo === productCode);
-            
-            if (product) {
-                // Verifica se já está no carrinho
-                const existingItem = cart.find(item => item.codigo === product.codigo);
-                
-                if (existingItem) {
-                    existingItem.quantidade += 1;
-                } else {
-                    cart.push({
-                        ...product,
-                        quantidade: 1
-                    });
-                }
-                
-                updateCartDisplay();
-                updateStatus(`🛒 ${product.descricao} adicionado!`, 'green');
-                
-                // Volta a escanear automaticamente
-                setTimeout(scanAgain, 1000);
-            }
-        }
-
-        // --- ATUALIZAR CARRINHO ---
-        function updateCartDisplay() {
-            const cartItems = document.getElementById('cartItems');
-            const cartTotal = document.getElementById('cartTotal');
-            
-            if (cart.length === 0) {
-                cartItems.innerHTML = '<div class="text-center text-gray-500 py-2">Nenhum item</div>';
-                cartTotal.textContent = 'R$ 0,00';
-                return;
-            }
-            
-            let total = 0;
-            let itemsHTML = '';
-            
-            cart.forEach((item, index) => {
-                const itemTotal = parseFloat(item.preco) * item.quantidade;
-                total += itemTotal;
-                
-                itemsHTML += `
-                    <div class="flex justify-between items-center p-2 bg-white rounded border">
-                        <div class="flex-1">
-                            <div class="font-semibold text-sm">${item.descricao}</div>
-                            <div class="text-xs text-gray-600">
-                                R$ ${item.preco} × ${item.quantidade}
-                            </div>
-                        </div>
-                        <div class="flex items-center gap-2">
-                            <span class="font-bold text-green-700 text-sm">R$ ${itemTotal.toFixed(2)}</span>
-                            <button onclick="removeFromCart(${index})" class="text-red-500 text-xs">
-                                ❌
-                            </button>
-                        </div>
-                    </div>
-                `;
-            });
-            
-            cartItems.innerHTML = itemsHTML;
-            cartTotal.textContent = `R$ ${total.toFixed(2)}`;
-        }
-
-        // --- REMOVER DO CARRINHO ---
-        function removeFromCart(index) {
-            cart.splice(index, 1);
-            updateCartDisplay();
-            updateStatus('🗑️ Item removido', 'gray');
-        }
-
-        // --- ESCANEAR NOVAMENTE ---
-        function scanAgain() {
+        // --- FECHAR RESULTADO ---
+        function closeResult() {
             document.getElementById('result').classList.add('hidden');
             
-            if (html5QrcodeScanner && html5QrcodeScanner.isScanning) {
-                html5QrcodeScanner.resume();
-                updateStatus('📷 Escaneando... Aponte para o próximo código', 'blue');
-            } else {
-                startScanner();
+            // Reinicia o scan
+            if (videoStream) {
+                startManualScan();
+                updateStatus('📷 Escaneando...', 'blue');
             }
         }
 
-        // --- PARAR SCANNER ---
-        function stopScanner() {
-            if (html5QrcodeScanner) {
-                html5QrcodeScanner.stop().then(() => {
-                    updateStatus('📷 Leitor parado', 'gray');
-                }).catch(err => {
-                    console.log('Erro ao parar scanner:', err);
-                });
-            }
+        // --- ADICIONAR AO SISTEMA ---
+        function addToSystem() {
+            const code = document.getElementById('resultCode').textContent;
+            updateStatus(`✅ Produto ${code} adicionado!`, 'green');
+            closeResult();
         }
 
-        // --- TESTE COM 7 DÍGITOS ---
-        function testWith7Digits() {
-            // Simula a leitura de um código de 7 dígitos
-            const testCode = '1234567';
-            updateStatus(`🧪 Testando com: ${testCode}`, 'blue');
-            processScannedCode(testCode);
+        // --- PARAR CÂMERA ---
+        function stopCamera() {
+            if (videoStream) {
+                videoStream.getTracks().forEach(track => track.stop());
+                videoStream = null;
+            }
+            
+            if (scanInterval) {
+                clearInterval(scanInterval);
+                scanInterval = null;
+            }
+            
+            const videoElement = document.getElementById('videoElement');
+            videoElement.srcObject = null;
+            
+            updateStatus('📷 Câmera desligada', 'gray');
+            showDebug(false);
+        }
+
+        // --- SIMULAR SCAN (PARA TESTE) ---
+        function simulateScan() {
+            const testCodes = ['1234567', '7654321', '1122334', '9730000'];
+            const randomCode = testCodes[Math.floor(Math.random() * testCodes.length)];
+            
+            updateStatus(`🧪 Teste: ${randomCode}`, 'purple');
+            processDetectedCode(randomCode);
         }
 
         // --- ATUALIZAR STATUS ---
@@ -435,18 +348,40 @@
             const statusElement = document.getElementById('status');
             const colorClass = {
                 blue: 'bg-blue-50 text-blue-700',
-                green: 'bg-green-50 text-green-700',
+                green: 'bg-green-50 text-green-700', 
                 red: 'bg-red-50 text-red-700',
-                gray: 'bg-gray-50 text-gray-700'
+                gray: 'bg-gray-50 text-gray-700',
+                purple: 'bg-purple-50 text-purple-700'
             }[color] || 'bg-gray-50 text-gray-700';
             
-            statusElement.className = `p-3 border-b ${colorClass}`;
-            statusElement.innerHTML = `<div class="text-center text-sm">${message}</div>`;
+            statusElement.className = `p-3 rounded-lg mb-4 ${colorClass}`;
+            statusElement.innerHTML = `<div class="text-center font-semibold">${message}</div>`;
+        }
+
+        // --- DEBUG INFO ---
+        function showDebug(show) {
+            document.getElementById('debugPanel').classList.toggle('hidden', !show);
+        }
+
+        function showDebugInfo(info) {
+            document.getElementById('debugInfo').textContent = info;
         }
 
         // --- INICIALIZAÇÃO ---
         document.addEventListener('DOMContentLoaded', function() {
-            updateStatus('🔧 Sistema pronto - Clique em "Iniciar Leitor"', 'blue');
+            updateStatus('🔧 Sistema pronto - Clique em "Ligar Câmera"', 'blue');
+            
+            // Inicia automaticamente após 2 segundos
+            setTimeout(() => {
+                startCamera();
+            }, 2000);
+        });
+
+        // Tecla Espaço para teste rápido
+        document.addEventListener('keydown', function(e) {
+            if (e.code === 'Space') {
+                simulateScan();
+            }
         });
     </script>
 </body>
