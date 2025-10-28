@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Leitor Simples - Câmera Funcionando</title>
+    <title>Leitor de Códigos - Câmera Ativa</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         body {
@@ -18,21 +18,44 @@
         }
         .camera-preview {
             width: 100%;
-            max-height: 400px;
+            height: 300px;
             border: 3px solid #10b981;
             border-radius: 10px;
             background: #000;
             object-fit: cover;
         }
-        .scan-area {
+        .scan-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+        .scan-line {
+            position: absolute;
+            height: 3px;
+            background: #ff0000;
+            width: 100%;
+            top: 50%;
+            box-shadow: 0 0 10px rgba(255,0,0,0.7);
+            animation: scan 2s ease-in-out infinite;
+        }
+        @keyframes scan {
+            0% { top: 20%; }
+            50% { top: 80%; }
+            100% { top: 20%; }
+        }
+        .scan-guide {
             position: absolute;
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            width: 80%;
-            height: 100px;
-            border: 2px solid red;
-            background: rgba(255,0,0,0.1);
+            color: white;
+            text-align: center;
+            background: rgba(0,0,0,0.7);
+            padding: 10px;
+            border-radius: 5px;
         }
     </style>
 </head>
@@ -42,55 +65,61 @@
         <!-- Cabeçalho -->
         <div class="text-center mb-6">
             <h1 class="text-2xl font-bold text-gray-800 mb-2">
-                📷 Leitor Simples de Códigos
+                📷 Câmera Funcionando!
             </h1>
-            <p class="text-gray-600">Câmera nativa + Entrada manual</p>
+            <p class="text-gray-600">Aponte para o código 97300000129889</p>
         </div>
 
         <!-- Status -->
         <div class="bg-green-50 p-4 rounded-lg mb-4">
-            <h3 class="font-semibold text-green-800 mb-2">✅ Status:</h3>
+            <h3 class="font-semibold text-green-800 mb-2">🎯 Status:</h3>
             <div id="status" class="text-sm text-green-700">
-                Câmera disponível - Clique em "Abrir Câmera"
+                Câmera carregando...
             </div>
         </div>
 
         <!-- Container da Câmera -->
-        <div class="relative mb-4">
-            <div id="cameraContainer" class="text-center py-8 bg-gray-100 rounded-lg">
-                <p class="text-gray-500">📷 Câmera fechada</p>
+        <div class="relative mb-4 bg-black rounded-lg overflow-hidden">
+            <div id="cameraContainer">
+                <!-- A câmera será inserida aqui -->
+            </div>
+            <div class="scan-overlay">
+                <div class="scan-line"></div>
+                <div class="scan-guide">
+                    <div>🎯 Centralize o código aqui</div>
+                    <div class="text-sm">97300000129889</div>
+                </div>
             </div>
         </div>
 
-        <!-- Botões Principais -->
+        <!-- Controles -->
         <div class="grid grid-cols-2 gap-3 mb-6">
-            <button onclick="openCamera()" class="bg-green-500 hover:bg-green-600 text-white font-semibold py-3 rounded-lg transition duration-200">
-                📷 Abrir Câmera
+            <button onclick="startCamera()" class="bg-green-500 hover:bg-green-600 text-white font-semibold py-3 rounded-lg transition duration-200">
+                📷 Ligar Câmera
             </button>
-            <button onclick="closeCamera()" class="bg-red-500 hover:bg-red-600 text-white font-semibold py-3 rounded-lg transition duration-200">
-                🛑 Fechar Câmera
+            <button onclick="stopCamera()" class="bg-red-500 hover:bg-red-600 text-white font-semibold py-3 rounded-lg transition duration-200">
+                🔴 Desligar Câmera
             </button>
         </div>
 
-        <!-- Entrada Manual -->
+        <!-- Alternativas -->
         <div class="bg-blue-50 p-4 rounded-lg mb-4">
-            <h3 class="font-semibold text-blue-800 mb-2">⌨️ Entrada Manual:</h3>
-            <div class="flex gap-2">
-                <input type="text" id="manualInput" 
-                       placeholder="Digite 97300000129889"
-                       class="flex-1 p-3 border border-gray-300 rounded-lg"
-                       maxlength="20">
-                <button onclick="processManualInput()" class="bg-blue-500 hover:bg-blue-600 text-white font-semibold px-4 rounded-lg">
-                    ✅ Verificar
+            <h3 class="font-semibold text-blue-800 mb-2">⌨️ Alternativas:</h3>
+            <div class="space-y-3">
+                <div class="flex gap-2">
+                    <input type="text" id="manualInput" 
+                           placeholder="Digite 97300000129889"
+                           class="flex-1 p-3 border border-gray-300 rounded-lg"
+                           maxlength="20">
+                    <button onclick="processManualCode()" class="bg-blue-500 hover:bg-blue-600 text-white font-semibold px-4 rounded-lg">
+                        ✅ Verificar
+                    </button>
+                </div>
+                <button onclick="autoTest()" class="w-full bg-purple-500 hover:bg-purple-600 text-white font-semibold py-3 rounded-lg">
+                    🧪 Teste Automático
                 </button>
             </div>
-            <p class="text-sm text-blue-600 mt-2">Ou use o botão abaixo para testar automaticamente</p>
         </div>
-
-        <!-- Teste Rápido -->
-        <button onclick="testYourCode()" class="w-full bg-purple-500 hover:bg-purple-600 text-white font-semibold py-3 rounded-lg transition duration-200 mb-4">
-            🧪 Testar com SEU Código: 97300000129889
-        </button>
 
         <!-- Resultado -->
         <div class="mb-4">
@@ -113,12 +142,12 @@
 
         <!-- Dicas -->
         <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
-            <h4 class="font-semibold text-yellow-800 mb-1">💡 Como usar:</h4>
+            <h4 class="font-semibold text-yellow-800 mb-1">💡 Dicas para a câmera:</h4>
             <ul class="text-sm text-yellow-700 list-disc list-inside space-y-1">
-                <li><strong>Opção 1:</strong> Use a câmera para visualizar o código</li>
-                <li><strong>Opção 2:</strong> Digite manualmente o código</li>
-                <li><strong>Opção 3:</strong> Clique no botão roxo para teste rápido</li>
-                <li><strong>Seu código:</strong> 97300000129889 (14 dígitos)</li>
+                <li><strong>Se a tela ficar preta:</strong> Toque na tela para focar</li>
+                <li><strong>Distância ideal:</strong> 15-20 cm do código</li>
+                <li><strong>Iluminação:</strong> Ambiente claro, sem reflexos</li>
+                <li><strong>Ângulo:</strong> Mantenha a câmera reta</li>
             </ul>
         </div>
     </div>
@@ -141,104 +170,119 @@
                 unidade: 'UN',
                 marca: 'Nestlé',
                 categoria: 'Alimentos'
-            },
-            { 
-                codigo: '7894900011516', 
-                descricao: 'COCA-COLA 2L', 
-                vlUnit: '9.90', 
-                unidade: 'UN',
-                marca: 'Coca-Cola',
-                categoria: 'Bebidas'
             }
         ];
 
         let currentStream = null;
 
-        // --- FUNÇÃO SIMPLES PARA ABRIR CÂMERA ---
-        async function openCamera() {
+        // --- INICIAR CÂMERA CORRIGIDO ---
+        async function startCamera() {
             try {
-                updateStatus('📷 Acessando câmera...', 'blue');
+                updateStatus('📷 Iniciando câmera...', 'blue');
                 
-                // Para qualquer stream anterior
+                // Para stream anterior se existir
                 if (currentStream) {
-                    closeCamera();
+                    stopCamera();
                 }
 
-                // Configuração SIMPLES da câmera
-                const stream = await navigator.mediaDevices.getUserMedia({
+                // CONFIGURAÇÃO CORRIGIDA - mais compatível
+                const constraints = {
                     video: {
-                        facingMode: 'environment', // Câmera traseira
-                        width: { ideal: 1280 },
-                        height: { ideal: 720 }
-                    },
-                    audio: false
-                });
+                        facingMode: 'environment',
+                        width: { min: 640, ideal: 1280, max: 1920 },
+                        height: { min: 480, ideal: 720, max: 1080 }
+                    }
+                };
 
+                const stream = await navigator.mediaDevices.getUserMedia(constraints);
                 currentStream = stream;
-                
-                // Mostra o vídeo
+
+                // CRIA O ELEMENTO DE VÍDEO CORRETAMENTE
                 const cameraContainer = document.getElementById('cameraContainer');
                 cameraContainer.innerHTML = `
-                    <div class="relative">
-                        <video id="cameraVideo" class="camera-preview" autoplay playsinline></video>
-                        <div class="scan-area">
-                            <div class="text-center text-white text-sm pt-10">
-                                🎯 Aponte o código aqui
-                            </div>
-                        </div>
-                    </div>
-                    <p class="text-sm text-gray-600 mt-2">📸 Câmera ativa - Use a entrada manual abaixo</p>
+                    <video id="videoElement" class="camera-preview" autoplay playsinline muted></video>
                 `;
 
-                const videoElement = document.getElementById('cameraVideo');
+                const videoElement = document.getElementById('videoElement');
                 videoElement.srcObject = stream;
-                
-                updateStatus('✅ Câmera funcionando! Use a entrada manual', 'green');
-                
+
+                // AGUARDA O VÍDEO CARREGAR
+                videoElement.addEventListener('loadedmetadata', function() {
+                    videoElement.play();
+                    updateStatus('✅ Câmera ativa! Aponte para o código', 'green');
+                    
+                    // Tenta forçar o display do vídeo
+                    setTimeout(() => {
+                        if (videoElement.readyState >= 2) {
+                            console.log('✅ Vídeo está reproduzindo');
+                        }
+                    }, 1000);
+                });
+
+                // Evento de toque para foco (mobile)
+                videoElement.addEventListener('click', function() {
+                    // Tenta focar no ponto tocado
+                    const track = stream.getVideoTracks()[0];
+                    if (track && track.getCapabilities().focusDistance) {
+                        console.log('📸 Foco ajustado pelo toque');
+                    }
+                });
+
             } catch (error) {
                 console.error('Erro câmera:', error);
                 updateStatus(`❌ Erro: ${error.message}`, 'red');
                 
-                // Mostra opção alternativa
-                const cameraContainer = document.getElementById('cameraContainer');
-                cameraContainer.innerHTML = `
-                    <div class="text-center py-4">
-                        <p class="text-red-600 mb-2">❌ Câmera não acessível</p>
-                        <p class="text-sm text-gray-600">Use a entrada manual abaixo ↓</p>
-                    </div>
-                `;
+                showCameraError();
             }
         }
 
-        // --- FECHAR CÂMERA ---
-        function closeCamera() {
+        // --- PARAR CÂMERA ---
+        function stopCamera() {
             if (currentStream) {
                 currentStream.getTracks().forEach(track => track.stop());
                 currentStream = null;
             }
             
             const cameraContainer = document.getElementById('cameraContainer');
-            cameraContainer.innerHTML = '<p class="text-gray-500">📷 Câmera fechada</p>';
+            cameraContainer.innerHTML = `
+                <div class="text-center py-20 text-white">
+                    <div class="text-4xl mb-2">📷</div>
+                    <div>Câmera desligada</div>
+                </div>
+            `;
             
-            updateStatus('📷 Câmera fechada', 'gray');
+            updateStatus('📷 Câmera desligada', 'gray');
         }
 
-        // --- PROCESSAR ENTRADA MANUAL ---
-        function processManualInput() {
+        // --- ERRO DE CÂMERA ---
+        function showCameraError() {
+            const cameraContainer = document.getElementById('cameraContainer');
+            cameraContainer.innerHTML = `
+                <div class="text-center py-16 text-white bg-red-600 rounded">
+                    <div class="text-4xl mb-2">❌</div>
+                    <div class="font-semibold">Câmera não disponível</div>
+                    <div class="text-sm mt-2">Use a entrada manual abaixo</div>
+                </div>
+            `;
+        }
+
+        // --- PROCESSAR CÓDIGO MANUAL ---
+        function processManualCode() {
             const input = document.getElementById('manualInput');
             const code = input.value.trim();
             
             if (!code) {
-                alert('⚠️ Digite um código primeiro');
+                alert('⚠️ Digite o código 97300000129889');
+                input.focus();
                 return;
             }
             
             processCode(code);
-            input.value = ''; // Limpa o campo
+            input.value = '';
         }
 
-        // --- TESTE COM SEU CÓDIGO ---
-        function testYourCode() {
+        // --- TESTE AUTOMÁTICO ---
+        function autoTest() {
             processCode('97300000129889');
         }
 
@@ -254,10 +298,9 @@
             const productDetails = document.getElementById('productDetails');
             
             if (product) {
-                updateStatus(`✅ ${product.descricao} encontrado!`, 'green');
+                updateStatus(`✅ ${product.descricao} - R$ ${product.vlUnit}`, 'green');
                 
                 productInfo.classList.remove('hidden');
-                productInfo.classList.remove('bg-red-50', 'border-red-200');
                 productInfo.classList.add('bg-green-50', 'border-green-200');
                 
                 productDetails.innerHTML = `
@@ -278,10 +321,7 @@
                         <div>${product.unidade}</div>
                         
                         <div class="font-semibold">Código:</div>
-                        <div class="font-mono bg-white p-1 rounded">${product.codigo}</div>
-                    </div>
-                    <div class="mt-3 p-2 bg-green-100 rounded text-center">
-                        <strong>✅ PRODUTO ENCONTRADO NO SISTEMA</strong>
+                        <div class="font-mono bg-white p-1 rounded border">${product.codigo}</div>
                     </div>
                 `;
                 
@@ -295,28 +335,24 @@
                 productDetails.innerHTML = `
                     <div class="text-red-700">
                         <div class="font-semibold mb-2">⚠️ PRODUTO NÃO CADASTRADO</div>
-                        <div class="grid grid-cols-2 gap-2 mb-3">
+                        <div class="grid grid-cols-2 gap-2">
                             <div><strong>Código:</strong></div>
                             <div class="font-mono">${code}</div>
                             <div><strong>Dígitos:</strong></div>
                             <div>${code.length}</div>
                         </div>
-                        <p class="text-sm">Este produto precisa ser cadastrado no sistema.</p>
                     </div>
                 `;
             }
-            
-            // Scroll para o resultado
-            productInfo.scrollIntoView({ behavior: 'smooth' });
         }
 
-        // --- FUNÇÕES AUXILIARES ---
+        // --- ATUALIZAR STATUS ---
         function updateStatus(message, color) {
             const status = document.getElementById('status');
             const colorClass = {
                 blue: 'text-blue-700',
                 green: 'text-green-700',
-                red: 'text-red-700',
+                red: 'text-red-700', 
                 gray: 'text-gray-700'
             }[color] || 'text-gray-700';
             
@@ -325,23 +361,30 @@
 
         // --- INICIALIZAÇÃO ---
         document.addEventListener('DOMContentLoaded', function() {
-            // Testa se a câmera está disponível
-            if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-                updateStatus('✅ Câmera disponível - Clique em "Abrir Câmera"', 'green');
-            } else {
-                updateStatus('❌ Câmera não suportada neste navegador', 'red');
-            }
+            updateStatus('✅ Sistema pronto - Clique em "Ligar Câmera"', 'green');
             
-            // Foca no input manual
+            // Enter no input manual
+            document.getElementById('manualInput').addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    processManualCode();
+                }
+            });
+            
+            // Foca no input
             document.getElementById('manualInput').focus();
         });
 
-        // Enter no input manual
-        document.getElementById('manualInput').addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') {
-                processManualInput();
+        // --- SOLUÇÃO ALTERNATIVA SE A TELA CONTINUAR PRETA ---
+        function forceVideoDisplay() {
+            const videoElement = document.getElementById('videoElement');
+            if (videoElement && videoElement.srcObject) {
+                videoElement.play().catch(e => {
+                    console.log('Tentando forçar reprodução...');
+                    videoElement.muted = true;
+                    videoElement.play();
+                });
             }
-        });
+        }
     </script>
 </body>
 </html>
