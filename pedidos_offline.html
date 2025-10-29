@@ -107,10 +107,34 @@
             padding: 0;
             overflow: hidden;
         }
+        /* Modal de senha */
+        #passwordModal {
+            z-index: 1000;
+        }
     </style>
 </head>
 <body>
     
+    <!-- Modal de Senha -->
+    <div id="passwordModal" class="overlay">
+        <div class="overlay-content max-w-sm">
+            <h2 class="text-2xl font-bold text-gray-800 mb-4 text-center">🔒 Acesso Restrito</h2>
+            <p class="text-sm text-gray-600 mb-4 text-center">Digite a senha para acessar o sistema</p>
+            
+            <input type="password" id="passwordInput" placeholder="Digite a senha" 
+                class="w-full p-3 border border-gray-300 rounded-lg text-center text-lg font-mono mb-4 focus:ring-indigo-500 focus:border-indigo-500"
+                onkeypress="handlePasswordKeypress(event)">
+            
+            <button onclick="checkPassword()" class="w-full bg-indigo-500 hover:bg-indigo-600 text-white font-semibold py-3 rounded-lg transition duration-200">
+                🔓 Acessar Sistema
+            </button>
+
+            <div class="mt-4 text-center">
+                <p class="text-xs text-gray-500">Senha padrão: 653674</p>
+            </div>
+        </div>
+    </div>
+
     <!-- Modal da Câmera -->
     <div id="cameraModal" class="overlay hidden">
         <div class="overlay-content">
@@ -194,7 +218,7 @@
     </div>
 
     <!-- Tela Principal -->
-    <div id="mainQuotationView" class="view-container">
+    <div id="mainQuotationView" class="view-container hidden">
         <div class="card">
             <!-- Cabeçalho compacto que some durante a busca -->
             <div id="compactHeader" class="compact-header text-center mb-4">
@@ -212,7 +236,8 @@
                 </label>
                 <div class="flex gap-2">
                     <input type="text" id="codeInput" placeholder="Digite código ou descrição (ex: 'moni pol')" 
-                        class="flex-grow p-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 text-base text-center font-mono">
+                        class="flex-grow p-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 text-base text-center font-mono"
+                        onkeypress="handleSearchKeypress(event)">
                     <button onclick="window.openCamera()" class="bg-indigo-500 hover:bg-indigo-600 text-white p-3 rounded-lg shadow-md flex items-center justify-center transition duration-200">
                         📷
                     </button>
@@ -240,7 +265,8 @@
                     <div class="pt-3">
                         <label for="quantityInput" class="block text-sm font-medium text-gray-700 mb-1">QUANTIDADE</label>
                         <input type="number" id="quantityInput" value="1" min="1" 
-                            class="w-20 p-2 border border-gray-300 rounded-lg text-center font-semibold text-base mx-auto block focus:ring-indigo-500 focus:border-indigo-500">
+                            class="w-20 p-2 border border-gray-300 rounded-lg text-center font-semibold text-base mx-auto block focus:ring-indigo-500 focus:border-indigo-500"
+                            onkeypress="handleQuantityKeypress(event)">
                     </div>
                 </div>
             </div>
@@ -270,6 +296,9 @@
     </div>
 
     <script>
+        // --- CONFIGURAÇÃO DA SENHA ---
+        const SYSTEM_PASSWORD = "653674"; // SENHA DO SISTEMA - PODE ALTERAR AQUI
+
         // --- VARIÁVEIS DE ESTADO ---
         let productDatabase = [];
         let selectedItems = [];
@@ -281,6 +310,7 @@
         const optionsView = document.getElementById('optionsOverlay');
         const managementView = document.getElementById('managementOverlay');
         const cameraModal = document.getElementById('cameraModal');
+        const passwordModal = document.getElementById('passwordModal');
         const codeInput = document.getElementById('codeInput');
         const quantityInput = document.getElementById('quantityInput');
         const selectButton = document.getElementById('selectButton');
@@ -299,6 +329,66 @@
         const cameraVideo = document.getElementById('cameraVideo');
         const resultsCount = document.getElementById('resultsCount');
         const compactHeader = document.getElementById('compactHeader');
+        const passwordInput = document.getElementById('passwordInput');
+
+        // --- SISTEMA DE SENHA ---
+        function checkPassword() {
+            const enteredPassword = passwordInput.value.trim();
+            
+            if (enteredPassword === SYSTEM_PASSWORD) {
+                passwordModal.style.display = 'none';
+                mainView.classList.remove('hidden');
+                window.loadDatabase();
+                window.loadQuote();
+                window.updateProductCountUI();
+                codeInput.focus();
+                window.showMessage('✅ Acesso permitido!', 'success');
+            } else {
+                passwordInput.value = '';
+                passwordInput.focus();
+                window.showMessage('❌ Senha incorreta! Tente novamente.', 'error');
+            }
+        }
+
+        function handlePasswordKeypress(event) {
+            if (event.key === 'Enter') {
+                checkPassword();
+            }
+        }
+
+        // --- FUNÇÃO PARA FECHAR TECLADO ---
+        function closeKeyboard() {
+            // Foca em um elemento não editável para fechar o teclado
+            const dummyElement = document.createElement('input');
+            dummyElement.style.position = 'absolute';
+            dummyElement.style.opacity = '0';
+            dummyElement.style.height = '0';
+            dummyElement.style.fontSize = '16px'; // Prevenir zoom no iOS
+            document.body.appendChild(dummyElement);
+            dummyElement.focus();
+            setTimeout(() => {
+                document.body.removeChild(dummyElement);
+            }, 100);
+        }
+
+        // --- HANDLERS PARA TECLAS ENTER ---
+        function handleSearchKeypress(event) {
+            if (event.key === 'Enter') {
+                closeKeyboard();
+                // Foca no primeiro resultado se houver, senão mantém no campo
+                const firstResult = document.querySelector('.search-result');
+                if (firstResult) {
+                    firstResult.focus();
+                }
+            }
+        }
+
+        function handleQuantityKeypress(event) {
+            if (event.key === 'Enter') {
+                closeKeyboard();
+                addProductToQuote();
+            }
+        }
 
         // --- FUNÇÕES GLOBAIS ---
 
@@ -597,19 +687,27 @@
             const clientName = prompt('📝 Digite o nome do cliente:');
             if (!clientName) return;
 
+            // Gera o CSV mas não mostra download
             const csvData = window.generateCSV(clientName);
             const whatsappMessage = window.generateWhatsAppMessage(clientName);
-            window.simulateCSVDownload(clientName, csvData);
             
+            // Cria o CSV silenciosamente sem mostrar download
+            const blob = new Blob([csvData], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            
+            // Abre WhatsApp diretamente sem confirmação extra
             const whatsappLink = `whatsapp://send?text=${encodeURIComponent(whatsappMessage)}`;
             
-            window.showMessage('✅ CSV gerado! Abrindo WhatsApp...', 'success');
+            window.showMessage('📱 Abrindo WhatsApp...', 'success');
             
+            // Abre WhatsApp diretamente
             setTimeout(() => {
-                const shouldOpen = confirm('📱 Pronto! Clique em OK para abrir o WhatsApp e enviar a cotação.');
-                if (shouldOpen) {
-                    window.location.href = whatsappLink;
-                }
+                window.location.href = whatsappLink;
+                
+                // Limpa o URL do blob após um tempo
+                setTimeout(() => {
+                    URL.revokeObjectURL(url);
+                }, 1000);
             }, 500);
         };
 
@@ -682,19 +780,6 @@ _O arquivo CSV com detalhes completos foi gerado e pode ser anexado como documen
 
 📅 ${new Date().toLocaleDateString('pt-BR')}
 ⏰ ${new Date().toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'})}`;
-        };
-
-        window.simulateCSVDownload = function(clientName, csvData) {
-            const blob = new Blob([csvData], { type: 'text/csv;charset=utf-8;' });
-            const link = document.createElement('a');
-            const url = URL.createObjectURL(blob);
-            const filename = `Cotacao_${clientName}_${Date.now()}.csv`;
-            link.setAttribute('href', url);
-            link.setAttribute('download', filename);
-            link.style.display = 'none';
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
         };
 
         window.clearQuoteWithConfirmation = function() {
@@ -840,13 +925,10 @@ _O arquivo CSV com detalhes completos foi gerado e pode ser anexado como documen
             reader.readAsText(file);
         });
 
-        // Inicialização
+        // Inicialização - SEMPRE MOSTRA SENHA PRIMEIRO
         window.onload = () => {
-            window.loadDatabase();
-            window.loadQuote();
-            window.updateProductCountUI();
-            window.toggleView('main');
-            codeInput.focus();
+            passwordModal.style.display = 'block';
+            passwordInput.focus();
         };
     </script>
 </body>
