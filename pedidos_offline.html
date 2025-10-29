@@ -60,10 +60,76 @@
             box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
             position: relative;
         }
+        .search-result {
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+        .search-result:hover {
+            background-color: #f0fdf4;
+            transform: translateX(4px);
+        }
+        /* Estilos para a câmera */
+        #cameraModal {
+            z-index: 100;
+        }
+        #cameraContainer {
+            position: relative;
+            width: 100%;
+            height: 300px;
+            background: #000;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        #cameraVideo {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        #scanArea {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 80%;
+            height: 120px;
+            border: 3px solid #4CAF50;
+            background: rgba(76, 175, 80, 0.1);
+            z-index: 10;
+            border-radius: 8px;
+        }
     </style>
 </head>
 <body>
     
+    <!-- Modal da Câmera -->
+    <div id="cameraModal" class="overlay hidden">
+        <div class="overlay-content">
+            <h2 class="text-2xl font-bold text-gray-800 mb-4 text-center">📷 Escanear Código de Barras</h2>
+            
+            <button onclick="window.closeCamera()" class="absolute top-4 right-4 text-gray-500 hover:text-gray-900 transition duration-200">
+                ✕
+            </button>
+
+            <div id="cameraContainer">
+                <video id="cameraVideo" autoplay playsinline></video>
+                <div id="scanArea"></div>
+            </div>
+
+            <div class="mt-4 text-center">
+                <p class="text-sm text-gray-600">Posicione o código de barras dentro da área verde</p>
+            </div>
+
+            <div class="mt-4 flex gap-3">
+                <button onclick="window.startCamera()" class="flex-1 bg-green-500 hover:bg-green-600 text-white font-semibold py-3 rounded-lg transition duration-200">
+                    🎥 Iniciar Câmera
+                </button>
+                <button onclick="window.simulateBarcode()" class="flex-1 bg-blue-500 hover:bg-blue-600 text-white font-semibold py-3 rounded-lg transition duration-200">
+                    🔢 Simular Código
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- Overlay de Gerenciamento -->
     <div id="managementOverlay" class="overlay">
         <div class="overlay-content">
@@ -131,16 +197,26 @@
                     CÓDIGO DE BARRAS / BUSCA POR DESCRIÇÃO
                 </label>
                 <div class="flex gap-2">
-                    <input type="text" id="codeInput" placeholder="Digite ou Escaneie o Código" 
+                    <input type="text" id="codeInput" placeholder="Digite código ou descrição (ex: 'moni pol')" 
                         class="flex-grow p-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 text-base text-center font-mono">
-                    <button onclick="handleCameraScan()" class="bg-indigo-500 hover:bg-indigo-600 text-white p-3 rounded-lg shadow-md flex items-center justify-center transition duration-200">
+                    <button onclick="window.openCamera()" class="bg-indigo-500 hover:bg-indigo-600 text-white p-3 rounded-lg shadow-md flex items-center justify-center transition duration-200">
                         📷
                     </button>
                 </div>
             </div>
 
+            <!-- Resultados da Busca SQL Like -->
+            <div id="searchResults" class="mb-4 max-h-64 overflow-y-auto border border-gray-200 rounded-lg hidden">
+                <div class="p-3 border-b border-gray-100 bg-gray-50">
+                    <p class="text-sm font-semibold text-gray-700">Resultados da Busca:</p>
+                </div>
+                <div id="resultsList" class="divide-y divide-gray-100">
+                    <!-- Resultados aparecem aqui -->
+                </div>
+            </div>
+
             <div id="productDisplay" class="border border-dashed border-gray-300 p-4 rounded-lg bg-gray-50 transition-all duration-300 min-h-[150px] flex flex-col justify-center items-center text-center">
-                <p id="messageText" class="text-gray-500 italic">Digite o código do item para começar.</p>
+                <p id="messageText" class="text-gray-500 italic">Digite o código ou descrição do item para começar.</p>
                 
                 <div id="productDetails" class="hidden w-full space-y-2">
                     <p class="text-xl font-bold text-gray-800" id="displayDescricao"></p>
@@ -177,11 +253,13 @@
         let productDatabase = [];
         let selectedItems = [];
         let foundProduct = null;
+        let cameraStream = null;
 
         // --- REFERÊNCIAS DO DOM ---
         const mainView = document.getElementById('mainQuotationView');
         const optionsView = document.getElementById('optionsOverlay');
         const managementView = document.getElementById('managementOverlay');
+        const cameraModal = document.getElementById('cameraModal');
         const codeInput = document.getElementById('codeInput');
         const quantityInput = document.getElementById('quantityInput');
         const selectButton = document.getElementById('selectButton');
@@ -194,8 +272,11 @@
         const fileInput = document.getElementById('fileInput');
         const currentProductCountSpan = document.getElementById('currentProductCount');
         const mainProductCountSpan = document.getElementById('mainProductCount');
+        const searchResults = document.getElementById('searchResults');
+        const resultsList = document.getElementById('resultsList');
+        const cameraVideo = document.getElementById('cameraVideo');
 
-        // --- FUNÇÕES GLOBAIS (ACESSÍVEIS DE QUALQUER LUGAR) ---
+        // --- FUNÇÕES GLOBAIS ---
 
         // Funções de UI
         window.showMessage = function(message, type) {
@@ -219,6 +300,7 @@
             mainView.style.display = 'none';
             optionsView.style.display = 'none';
             managementView.style.display = 'none';
+            cameraModal.style.display = 'none';
             
             if (viewName === 'main') {
                 mainView.style.display = 'flex';
@@ -229,27 +311,190 @@
             } else if (viewName === 'management') {
                 window.updateProductCountUI();
                 managementView.style.display = 'block';
+            } else if (viewName === 'camera') {
+                cameraModal.style.display = 'block';
             }
         };
+
+        // --- CÂMERA E SCANNER ---
+        window.openCamera = function() {
+            window.toggleView('camera');
+        };
+
+        window.closeCamera = function() {
+            if (cameraStream) {
+                cameraStream.getTracks().forEach(track => track.stop());
+                cameraStream = null;
+            }
+            window.toggleView('main');
+        };
+
+        window.startCamera = async function() {
+            try {
+                cameraStream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { 
+                        facingMode: 'environment',
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 }
+                    } 
+                });
+                cameraVideo.srcObject = cameraStream;
+                window.showMessage('✅ Câmera iniciada! Aponte para o código de barras.', 'success');
+            } catch (err) {
+                console.error('Erro ao acessar câmera:', err);
+                window.showMessage('❌ Não foi possível acessar a câmera. Use a simulação.', 'error');
+            }
+        };
+
+        window.simulateBarcode = function() {
+            const simulatedCodes = ['789123', '456789', '123456', '789012', '345678'];
+            const randomCode = simulatedCodes[Math.floor(Math.random() * simulatedCodes.length)];
+            
+            window.closeCamera();
+            codeInput.value = randomCode;
+            window.findProduct(randomCode);
+            window.showMessage(`✅ Código simulado: ${randomCode}`, 'success');
+        };
+
+        // --- BUSCA SQL LIKE MELHORADA ---
+        window.findProduct = function(searchTerm) {
+            const cleanSearch = String(searchTerm).trim();
+            foundProduct = null;
+            
+            // Esconde resultados anteriores
+            window.hideSearchResults();
+            
+            if (!cleanSearch) {
+                messageText.classList.remove('hidden');
+                productDetailsDiv.classList.add('hidden');
+                selectButton.disabled = true;
+                messageText.textContent = 'Digite o código ou descrição do item para começar.';
+                return;
+            }
+
+            // 1. Busca exata por código (prioridade máxima)
+            const exactCodeMatch = productDatabase.find(p => 
+                String(p.codigo).toUpperCase() === cleanSearch.toUpperCase()
+            );
+
+            if (exactCodeMatch) {
+                displayProduct(exactCodeMatch);
+                return;
+            }
+
+            // 2. Busca SQL Like por descrição (com múltiplas palavras)
+            if (cleanSearch.length >= 2) {
+                const searchFragments = cleanSearch.toUpperCase().split(' ').filter(frag => frag.length >= 2);
+                
+                if (searchFragments.length > 0) {
+                    const descriptionMatches = productDatabase.filter(product => {
+                        const cleanDesc = product.descricao.toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+                        
+                        // TODOS os fragmentos devem estar presentes na descrição (AND)
+                        return searchFragments.every(fragment => {
+                            const cleanFragment = fragment.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+                            return cleanDesc.includes(cleanFragment);
+                        });
+                    });
+
+                    if (descriptionMatches.length > 0) {
+                        if (descriptionMatches.length === 1) {
+                            // Se só tem um resultado, seleciona automaticamente
+                            displayProduct(descriptionMatches[0]);
+                        } else {
+                            // Se tem múltiplos resultados, mostra lista
+                            showSearchResults(descriptionMatches, searchFragments);
+                        }
+                        return;
+                    }
+                }
+            }
+
+            // Nada encontrado
+            messageText.classList.remove('hidden');
+            productDetailsDiv.classList.add('hidden');
+            selectButton.disabled = true;
+            messageText.textContent = `Nenhum produto encontrado para "${cleanSearch}"`;
+        };
+
+        function displayProduct(product) {
+            foundProduct = product;
+            messageText.classList.add('hidden');
+            productDetailsDiv.classList.remove('hidden');
+            selectButton.disabled = false;
+            
+            let value = parseFloat(String(product.vlUnit).replace(',', '.')); 
+            
+            document.getElementById('displayDescricao').textContent = product.descricao;
+            document.getElementById('displayCodigo').textContent = product.codigo;
+            document.getElementById('displayVLUnit').textContent = isNaN(value) ? 'N/A' : `R$ ${value.toFixed(2)}`;
+            document.getElementById('displayUnidade').textContent = product.unidade || 'UN';
+            quantityInput.value = 1;
+            
+            window.hideSearchResults();
+        }
+
+        function showSearchResults(results, searchFragments) {
+            resultsList.innerHTML = '';
+            
+            results.forEach(product => {
+                const resultElement = document.createElement('div');
+                resultElement.className = 'search-result p-3 cursor-pointer hover:bg-green-50';
+                resultElement.onclick = () => {
+                    codeInput.value = product.codigo;
+                    displayProduct(product);
+                    window.showMessage(`✅ "${product.descricao}" selecionado!`, 'success');
+                };
+                
+                resultElement.innerHTML = `
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <p class="font-semibold text-gray-800">${highlightSearchFragments(product.descricao, searchFragments)}</p>
+                            <p class="text-xs text-gray-600">Cód: ${product.codigo} | R$ ${product.vlUnit}</p>
+                        </div>
+                        <span class="bg-indigo-500 text-white px-2 py-1 rounded text-xs">Selecionar</span>
+                    </div>
+                `;
+                resultsList.appendChild(resultElement);
+            });
+            
+            searchResults.classList.remove('hidden');
+        }
+
+        function highlightSearchFragments(text, fragments) {
+            let highlightedText = text.toUpperCase();
+            fragments.forEach(fragment => {
+                const regex = new RegExp(`(${fragment})`, 'gi');
+                highlightedText = highlightedText.replace(regex, '<span class="bg-yellow-200 font-bold">$1</span>');
+            });
+            return highlightedText;
+        }
+
+        window.hideSearchResults = function() {
+            searchResults.classList.add('hidden');
+        };
+
+        window.selectProductFromSearch = function(code) {
+            const product = productDatabase.find(p => p.codigo === code);
+            if (product) {
+                codeInput.value = code;
+                displayProduct(product);
+                window.showMessage(`✅ "${product.descricao}" selecionado!`, 'success');
+            }
+        };
+
+        // --- FUNÇÕES EXISTENTES (mantidas como estavam) ---
         
         window.updateProductCountUI = function() {
             currentProductCountSpan.textContent = productDatabase.length;
             mainProductCountSpan.textContent = productDatabase.length;
         };
 
-        // --- FUNÇÕES VALIDADAS (LIXEIRA) ---
         window.removeItem = function(itemId) {
-            console.log('🎯 CLICOU NA LIXEIRA - Item ID:', itemId);
-            
             const item = selectedItems.find(i => i.id === itemId);
-            
-            if (!item) {
-                console.log('❌ Item não encontrado');
-                return;
-            }
+            if (!item) return;
             
             const userConfirmed = confirm(`Deseja realmente excluir "${item.descricao}" da lista?`);
-            
             if (!userConfirmed) {
                 window.showMessage('❌ Exclusão cancelada.', 'error');
                 return;
@@ -262,7 +507,6 @@
         };
 
         window.renderQuoteList = function() {
-            console.log('🔄 Renderizando lista de itens...');
             selectedItemsList.innerHTML = '';
             let total = 0;
 
@@ -297,10 +541,7 @@
             quoteItemCountSpan.textContent = selectedItems.length;
         };
 
-        // --- FUNÇÕES VALIDADAS (WHATSAPP) ---
         window.exportAndShare = function() {
-            console.log('🎯 Iniciando envio WhatsApp');
-            
             if (selectedItems.length === 0) {
                 alert('❌ Adicione itens antes de enviar a cotação!');
                 return;
@@ -309,16 +550,10 @@
             const clientName = prompt('📝 Digite o nome do cliente:');
             if (!clientName) return;
 
-            // Gerar CSV
             const csvData = window.generateCSV(clientName);
-            
-            // Gerar mensagem WhatsApp
             const whatsappMessage = window.generateWhatsAppMessage(clientName);
-            
-            // Simular download do CSV
             window.simulateCSVDownload(clientName, csvData);
             
-            // Preparar link WhatsApp
             const whatsappLink = `whatsapp://send?text=${encodeURIComponent(whatsappMessage)}`;
             
             window.showMessage('✅ CSV gerado! Abrindo WhatsApp...', 'success');
@@ -332,8 +567,6 @@
         };
 
         window.generateCSV = function(clientName) {
-            console.log('📈 Gerando CSV...');
-            
             const csvRows = [];
             csvRows.push(['Cliente', 'Codigo', 'Descricao', 'Quantidade', 'Valor_Unitario', 'Valor_Total_Item'].join(';'));
             
@@ -361,8 +594,6 @@
         };
 
         window.generateWhatsAppMessage = function(clientName) {
-            console.log('💭 Gerando mensagem WhatsApp...');
-            
             let totalCotacao = 0;
             selectedItems.forEach(item => {
                 totalCotacao += parseFloat(item.vlUnit) * item.quantity;
@@ -384,8 +615,6 @@ _O arquivo CSV com detalhes completos foi gerado e pode ser anexado como documen
         };
 
         window.simulateCSVDownload = function(clientName, csvData) {
-            console.log('💾 Simulando download CSV...');
-            
             const blob = new Blob([csvData], { type: 'text/csv;charset=utf-8;' });
             const link = document.createElement('a');
             const url = URL.createObjectURL(blob);
@@ -398,17 +627,13 @@ _O arquivo CSV com detalhes completos foi gerado e pode ser anexado como documen
             document.body.removeChild(link);
         };
 
-        // --- FUNÇÕES VALIDADAS (LIMPAR COTAÇÃO) ---
         window.clearQuoteWithConfirmation = function() {
-            console.log('🎯 INICIANDO: Limpar todos os itens');
-            
             if (selectedItems.length === 0) {
                 window.showMessage('ℹ️ A lista já está vazia.', 'info');
                 return;
             }
             
             const userConfirmed = confirm('Tem certeza que deseja limpar TODOS os itens da cotação?');
-            
             if (!userConfirmed) {
                 window.showMessage('❌ Limpeza cancelada.', 'error');
                 return;
@@ -420,12 +645,8 @@ _O arquivo CSV com detalhes completos foi gerado e pode ser anexado como documen
             window.showMessage('✅ Lista de cotação limpa com sucesso!', 'success');
         };
 
-        // --- FUNÇÕES VALIDADAS (LIMPAR BASE) ---
         window.clearDatabaseWithConfirmation = function() {
-            console.log('🎯 INICIANDO: Limpar base de dados');
-            
             const userConfirmed = confirm('Tem certeza que deseja limpar TODOS os dados da base?');
-            
             if (!userConfirmed) {
                 window.showMessage('❌ Limpeza cancelada pelo usuário.', 'error');
                 return;
@@ -438,12 +659,53 @@ _O arquivo CSV com detalhes completos foi gerado e pode ser anexado como documen
             window.toggleView('main');
         };
 
-        // --- OUTRAS FUNÇÕES GLOBAIS ---
+        window.addProductToQuote = function() {
+            if (!foundProduct) return;
+
+            const quantity = parseInt(quantityInput.value, 10);
+            if (isNaN(quantity) || quantity <= 0) {
+                window.showMessage('Quantidade deve ser um número positivo.', 'error');
+                return;
+            }
+            
+            const quoteItem = {
+                ...foundProduct, 
+                id: crypto.randomUUID(),
+                quantity: quantity
+            };
+
+            selectedItems.push(quoteItem);
+            window.saveQuote();
+            window.showMessage(`✅ Adicionado: ${quantity}x ${foundProduct.descricao}`, 'success');
+            
+            window.findProduct('');
+            codeInput.focus();
+        };
+
         window.loadDatabase = function() {
             try {
                 const storedData = localStorage.getItem('cotacao_product_database');
                 if (storedData) {
                     productDatabase = JSON.parse(storedData);
+                // Se não houver dados, carrega base de teste
+                    if (productDatabase.length === 0) {
+                        productDatabase = [
+                            { codigo: '789123', descricao: 'MONITOR LED 24 POLEGADAS FULL HD', vlUnit: '599.90', unidade: 'UN' },
+                            { codigo: '456789', descricao: 'MONITOR GAMER 27 POLEGADAS 144Hz', vlUnit: '899.90', unidade: 'UN' },
+                            { codigo: '123456', descricao: 'MOUSE GAMER RGB PROFISSIONAL', vlUnit: '89.90', unidade: 'UN' },
+                            { codigo: '789012', descricao: 'TECLADO MECANICO RGB AZUL', vlUnit: '199.90', unidade: 'UN' },
+                            { codigo: '345678', descricao: 'WEBCAM 1080P PROFESSIONAL STREAM', vlUnit: '159.90', unidade: 'UN' }
+                        ];
+                    }
+                } else {
+                    // Carrega base de teste se não houver dados salvos
+                    productDatabase = [
+                        { codigo: '789123', descricao: 'MONITOR LED 24 POLEGADAS FULL HD', vlUnit: '599.90', unidade: 'UN' },
+                        { codigo: '456789', descricao: 'MONITOR GAMER 27 POLEGADAS 144Hz', vlUnit: '899.90', unidade: 'UN' },
+                        { codigo: '123456', descricao: 'MOUSE GAMER RGB PROFISSIONAL', vlUnit: '89.90', unidade: 'UN' },
+                        { codigo: '789012', descricao: 'TECLADO MECANICO RGB AZUL', vlUnit: '199.90', unidade: 'UN' },
+                        { codigo: '345678', descricao: 'WEBCAM 1080P PROFESSIONAL STREAM', vlUnit: '159.90', unidade: 'UN' }
+                    ];
                 }
             } catch (e) {
                 productDatabase = [];
@@ -472,83 +734,6 @@ _O arquivo CSV com detalhes completos foi gerado e pode ser anexado como documen
             quoteItemCountSpan.textContent = selectedItems.length;
         };
 
-        window.findProduct = function(code) {
-            const cleanCode = String(code).trim();
-            foundProduct = null;
-            
-            let product = productDatabase.find(p => String(p.codigo).toUpperCase() === cleanCode.toUpperCase());
-
-            if (!product && cleanCode.length > 2) {
-                const normalizedCode = cleanCode.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-                product = productDatabase.find(p => 
-                    String(p.descricao).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").includes(normalizedCode)
-                );
-            }
-            
-            foundProduct = product;
-
-            if (foundProduct) {
-                messageText.classList.add('hidden');
-                productDetailsDiv.classList.remove('hidden');
-                selectButton.disabled = false;
-                
-                let value = parseFloat(String(foundProduct.vlUnit).replace(',', '.')); 
-                
-                document.getElementById('displayDescricao').textContent = foundProduct.descricao;
-                document.getElementById('displayCodigo').textContent = foundProduct.codigo;
-                document.getElementById('displayVLUnit').textContent = isNaN(value) ? 'N/A' : `R$ ${value.toFixed(2)}`;
-                document.getElementById('displayUnidade').textContent = foundProduct.unidade || 'UN';
-                quantityInput.value = 1;
-
-            } else {
-                messageText.classList.remove('hidden');
-                productDetailsDiv.classList.add('hidden');
-                selectButton.disabled = true;
-                messageText.textContent = cleanCode ? `Código/Descrição "${code}" não encontrado.` : `Digite o código do item para começar.`;
-            }
-        };
-
-        window.addProductToQuote = function() {
-            if (!foundProduct) return;
-
-            const quantity = parseInt(quantityInput.value, 10);
-            if (isNaN(quantity) || quantity <= 0) {
-                window.showMessage('Quantidade deve ser um número positivo.', 'error');
-                return;
-            }
-            
-            const quoteItem = {
-                ...foundProduct, 
-                id: crypto.randomUUID(),
-                quantity: quantity
-            };
-
-            selectedItems.push(quoteItem);
-            window.saveQuote();
-            window.showMessage(`✅ Adicionado: ${quantity}x ${foundProduct.descricao}`, 'success');
-            
-            window.findProduct('');
-            codeInput.focus();
-        };
-
-        window.handleCameraScan = async function() {
-            const simulatedCode = '789123';
-            
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-                stream.getTracks().forEach(track => track.stop());
-                window.showMessage('✅ Câmera ativada! Simulando leitura...', 'success');
-            } catch (err) {
-                window.showMessage('📷 Simulando leitura de código...', 'info');
-            }
-            
-            setTimeout(() => {
-                codeInput.value = simulatedCode;
-                window.findProduct(simulatedCode);
-                window.showMessage(`✅ Código lido: ${simulatedCode}`, 'success');
-            }, 1000);
-        };
-
         // Event Listeners
         codeInput.addEventListener('input', (e) => {
             window.findProduct(e.target.value);
@@ -562,9 +747,11 @@ _O arquivo CSV com detalhes completos foi gerado e pode ser anexado como documen
             reader.onload = function(e) {
                 // Simulação de importação
                 const testData = [
-                    { codigo: '789123', descricao: 'PRODUTO TESTE 1', vlUnit: '10.50', unidade: 'UN' },
-                    { codigo: '456789', descricao: 'PRODUTO TESTE 2', vlUnit: '25.00', unidade: 'UN' },
-                    { codigo: '123456', descricao: 'PRODUTO TESTE 3', vlUnit: '15.75', unidade: 'UN' }
+                    { codigo: '789123', descricao: 'MONITOR LED 24 POLEGADAS FULL HD', vlUnit: '599.90', unidade: 'UN' },
+                    { codigo: '456789', descricao: 'MONITOR GAMER 27 POLEGADAS 144Hz', vlUnit: '899.90', unidade: 'UN' },
+                    { codigo: '123456', descricao: 'MOUSE GAMER RGB PROFISSIONAL', vlUnit: '89.90', unidade: 'UN' },
+                    { codigo: '789012', descricao: 'TECLADO MECANICO RGB AZUL', vlUnit: '199.90', unidade: 'UN' },
+                    { codigo: '345678', descricao: 'WEBCAM 1080P PROFESSIONAL STREAM', vlUnit: '159.90', unidade: 'UN' }
                 ];
                 
                 productDatabase = testData;
