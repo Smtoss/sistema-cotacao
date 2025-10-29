@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste Câmera Android - Code 128</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/quagga/0.12.1/quagga.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: #f0f0f0;
+        }
+        .container {
+            max-width: 500px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        #cameraView {
+            width: 100%;
+            height: 300px;
+            background: #000;
+            margin: 20px 0;
+            border-radius: 10px;
+            overflow: hidden;
+            position: relative;
+        }
+        #interactive {
+            width: 100%;
+            height: 100%;
+        }
+        .scan-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            border: 3px solid #4CAF50;
+        }
+        .scan-line {
+            position: absolute;
+            height: 3px;
+            background: #ff0000;
+            width: 100%;
+            top: 50%;
+            animation: scan 2s ease-in-out infinite;
+        }
+        @keyframes scan {
+            0% { top: 20%; }
+            50% { top: 80%; }
+            100% { top: 20%; }
+        }
+        button {
+            width: 100%;
+            padding: 15px;
+            background: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+            cursor: pointer;
+            margin: 5px 0;
+        }
+        button:hover {
+            background: #45a049;
+        }
+        button:disabled {
+            background: #cccccc;
+            cursor: not-allowed;
+        }
+        .stop-btn {
+            background: #f44336;
+        }
+        .stop-btn:hover {
+            background: #da190b;
+        }
+        #result {
+            width: 100%;
+            padding: 15px;
+            font-size: 18px;
+            text-align: center;
+            border: 2px solid #4CAF50;
+            border-radius: 5px;
+            margin: 10px 0;
+            background: #f9f9f9;
+            font-family: monospace;
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+            text-align: center;
+        }
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .status.info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📷 Teste Câmera Android</h1>
+        <p>Teste simples de leitura Code 128</p>
+        
+        <div id="status" class="status info">
+            Clique em "Iniciar Câmera" para começar
+        </div>
+
+        <button id="startBtn" onclick="startCamera()">
+            📷 Iniciar Câmera
+        </button>
+        
+        <button id="stopBtn" class="stop-btn" onclick="stopCamera()" disabled>
+            🛑 Parar Câmera
+        </button>
+
+        <div id="cameraView">
+            <div id="interactive"></div>
+            <div class="scan-overlay">
+                <div class="scan-line"></div>
+            </div>
+        </div>
+
+        <div>
+            <label for="result">Código Lido:</label>
+            <input type="text" id="result" placeholder="---" readonly>
+        </div>
+
+        <div id="debug" style="font-size: 12px; color: #666; margin-top: 10px;">
+            Debug: Aguardando...
+        </div>
+    </div>
+
+    <script>
+        let isScannerActive = false;
+
+        function updateStatus(message, type = 'info') {
+            const status = document.getElementById('status');
+            status.className = `status ${type}`;
+            status.innerHTML = message;
+        }
+
+        function updateDebug(message) {
+            document.getElementById('debug').innerHTML = `Debug: ${message}`;
+            console.log(message);
+        }
+
+        function updateResult(code) {
+            document.getElementById('result').value = code;
+        }
+
+        function toggleButtons(starting) {
+            document.getElementById('startBtn').disabled = starting;
+            document.getElementById('stopBtn').disabled = !starting;
+        }
+
+        async function startCamera() {
+            if (isScannerActive) return;
+
+            updateStatus('Iniciando câmera...', 'info');
+            updateDebug('Solicitando acesso à câmera...');
+            toggleButtons(true);
+
+            try {
+                // Testa se a câmera está disponível
+                const stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { 
+                        facingMode: 'environment',
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 }
+                    } 
+                });
+                
+                // Para a stream imediatamente - só queríamos testar o acesso
+                stream.getTracks().forEach(track => track.stop());
+                
+                updateDebug('✅ Câmera acessível - Iniciando Quagga...');
+                
+                // Configuração específica para Code 128
+                Quagga.init({
+                    inputStream: {
+                        name: "Live",
+                        type: "LiveStream",
+                        target: document.querySelector("#interactive"),
+                        constraints: {
+                            width: 640,
+                            height: 480,
+                            facingMode: "environment"
+                        }
+                    },
+                    decoder: {
+                        readers: ["code_128_reader"]
+                    },
+                    locator: {
+                        patchSize: "medium",
+                        halfSample: true
+                    },
+                    numOfWorkers: 1,
+                    frequency: 10
+                }, function(err) {
+                    if (err) {
+                        updateStatus('Erro ao iniciar leitor: ' + err.message, 'error');
+                        updateDebug('❌ Erro Quagga: ' + err.message);
+                        toggleButtons(false);
+                        return;
+                    }
+                    
+                    Quagga.start();
+                    isScannerActive = true;
+                    updateStatus('✅ Câmera ativa! Aponte para um código Code 128', 'success');
+                    updateDebug('Leitor Code 128 ativo - escaneando...');
+                });
+
+                Quagga.onDetected(function(result) {
+                    if (result && result.codeResult) {
+                        const code = result.codeResult.code;
+                        const format = result.codeResult.format;
+                        
+                        if (format === 'code_128') {
+                            updateResult(code);
+                            updateStatus(`✅ Code 128 detectado: ${code}`, 'success');
+                            updateDebug(`Code 128 lido: ${code}`);
+                            
+                            // Para o scanner temporariamente
+                            setTimeout(() => {
+                                if (isScannerActive) {
+                                    updateStatus('📷 Escaneando...', 'info');
+                                }
+                            }, 2000);
+                        }
+                    }
+                });
+
+                Quagga.onProcessed(function(result) {
+                    if (result) {
+                        const ctx = Quagga.canvas.ctx.overlay;
+                        const canvas = Quagga.canvas.dom.overlay;
+                        
+                        ctx.clearRect(0, 0, canvas.width, canvas.height);
+                        
+                        if (result.box) {
+                            Quagga.ImageDebug.drawPath(result.box, {x: 0, y: 1}, ctx, {color: "green", lineWidth: 2});
+                        }
+                    }
+                });
+
+            } catch (error) {
+                updateStatus('Erro ao acessar câmera: ' + error.message, 'error');
+                updateDebug('❌ Erro câmera: ' + error.message);
+                toggleButtons(false);
+            }
+        }
+
+        function stopCamera() {
+            if (isScannerActive) {
+                Quagga.stop();
+                isScannerActive = false;
+            }
+            
+            const interactive = document.getElementById('interactive');
+            interactive.innerHTML = '';
+            
+            updateStatus('Câmera parada', 'info');
+            updateDebug('Scanner parado');
+            toggleButtons(false);
+        }
+
+        // Inicialização
+        document.addEventListener('DOMContentLoaded', function() {
+            updateDebug('Página carregada - pronto para testar');
+        });
+    </script>
+</body>
+</html>
