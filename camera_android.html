@@ -60,8 +60,6 @@
             background: rgba(0, 255, 0, 0.1);
             border-radius: 10px;
             transition: all 0.3s ease;
-            z-index: 10; /* ADICIONADO: Garantir que fique acima do vídeo */
-            box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.5); /* ADICIONADO: Escurecer ao redor */
         }
 
         #scan-overlay.scanning {
@@ -124,14 +122,11 @@
         }
 
         .zoom-controls {
-            display: flex; /* CORRIGIDO: Agora deve aparecer */
+            display: flex;
             align-items: center;
             justify-content: center;
             gap: 10px;
             margin: 10px 0;
-            background: #f8f9fa;
-            padding: 10px;
-            border-radius: 8px;
         }
 
         .zoom-btn {
@@ -143,47 +138,25 @@
             border: none;
             font-size: 18px;
             cursor: pointer;
-            display: flex; /* CORRIGIDO */
-            align-items: center;
-            justify-content: center;
         }
 
         .zoom-level {
             font-weight: bold;
             color: #333;
-            min-width: 50px;
-            text-align: center;
         }
 
         .status {
             text-align: center;
             margin: 10px 0;
             font-weight: bold;
-            padding: 8px;
-            border-radius: 5px;
         }
 
         .status.ready {
             color: #28a745;
-            background: rgba(40, 167, 69, 0.1);
         }
 
         .status.scanning {
             color: #dc3545;
-            background: rgba(220, 53, 69, 0.1);
-        }
-
-        /* ADICIONADO: Estilo para quando a câmera não está ativa */
-        #camera-container:not(.active) {
-            background: #333;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-        }
-
-        #camera-container:not(.active)::before {
-            content: "🎥 Clique em 'Iniciar Câmera'";
         }
     </style>
 </head>
@@ -197,7 +170,6 @@
 
         <div class="status ready" id="status">Pronto para escanear</div>
 
-        <!-- CORRIGIDO: Zoom controls agora visíveis -->
         <div class="zoom-controls">
             <button class="zoom-btn" onclick="changeZoom(-0.2)">-</button>
             <span class="zoom-level" id="zoomLevel">1.0x</span>
@@ -236,77 +208,74 @@
         const resultText = document.getElementById('resultText');
         const status = document.getElementById('status');
         const zoomLevel = document.getElementById('zoomLevel');
-        const cameraContainer = document.getElementById('camera-container');
 
         // Inicializar Quagga
-        function initQuagga() {
-            Quagga.init({
-                inputStream: {
-                    name: "Live",
-                    type: "LiveStream",
-                    target: camera,
-                    constraints: {
-                        width: 640,
-                        height: 480,
-                        facingMode: "environment" // Usar câmera traseira
-                    }
-                },
-                decoder: {
-                    readers: ["code_128_reader"]
-                },
-                locator: {
-                    patchSize: "medium",
-                    halfSample: true
-                },
-                locate: true,
-                frequency: 10
-            }, function(err) {
-                if (err) {
-                    console.error("Erro ao inicializar Quagga:", err);
-                    resultText.textContent = "Erro ao inicializar leitor: " + err.message;
-                    return;
+        Quagga.init({
+            inputStream: {
+                name: "Live",
+                type: "LiveStream",
+                target: camera,
+                constraints: {
+                    width: 640,
+                    height: 480,
+                    facingMode: "environment" // Usar câmera traseira
                 }
-                console.log("Quagga inicializado com sucesso");
-            });
+            },
+            decoder: {
+                readers: ["code_128_reader"]
+            },
+            locator: {
+                patchSize: "medium",
+                halfSample: true
+            },
+            locate: true,
+            frequency: 10
+        }, function(err) {
+            if (err) {
+                console.error("Erro ao inicializar Quagga:", err);
+                resultText.textContent = "Erro ao inicializar leitor: " + err.message;
+                return;
+            }
+            console.log("Quagga inicializado com sucesso");
+        });
 
-            // Configurar callbacks do Quagga
-            Quagga.onDetected(function(result) {
-                if (isScanning) return;
-                
-                isScanning = true;
-                scanOverlay.classList.remove('ready');
-                scanOverlay.classList.add('scanning');
-                status.textContent = "Código detectado!";
-                status.className = "status scanning";
-                
-                const code = result.codeResult.code;
-                resultText.textContent = code;
-                console.log("Código detectado:", code);
-                
-                // Feedback de áudio (opcional)
-                beep();
-                
-                // Reset após 2 segundos
-                setTimeout(() => {
-                    isScanning = false;
-                    scanOverlay.classList.remove('scanning');
-                    scanOverlay.classList.add('ready');
-                    status.textContent = "Pronto para escanear";
-                    status.className = "status ready";
-                }, 2000);
-            });
+        // Configurar callbacks do Quagga
+        Quagga.onDetected(function(result) {
+            if (isScanning) return;
+            
+            isScanning = true;
+            scanOverlay.classList.remove('ready');
+            scanOverlay.classList.add('scanning');
+            status.textContent = "Código detectado!";
+            status.className = "status scanning";
+            
+            const code = result.codeResult.code;
+            resultText.textContent = code;
+            console.log("Código detectado:", code);
+            
+            // Feedback de áudio (opcional)
+            beep();
+            
+            // Reset após 2 segundos
+            setTimeout(() => {
+                isScanning = false;
+                scanOverlay.classList.remove('scanning');
+                scanOverlay.classList.add('ready');
+                status.textContent = "Pronto para escanear";
+                status.className = "status ready";
+            }, 2000);
+        });
 
-            Quagga.onProcessed(function(result) {
-                if (!result) return;
-                
-                // Atualizar overlay baseado na detecção
-                if (result.codeResult && result.codeResult.code) {
-                    scanOverlay.style.borderColor = "#ff0000";
-                } else {
-                    scanOverlay.style.borderColor = "#00ff00";
-                }
-            });
-        }
+        Quagga.onProcessed(function(result) {
+            if (!result) return;
+            
+            // Atualizar overlay baseado na detecção
+            if (result.codeResult && result.codeResult.code) {
+                scanOverlay.style.borderColor = "#ff0000";
+            } else {
+                scanOverlay.style.borderColor = "#00ff00";
+            }
+        });
 
         // Controles de câmera
         async function startCamera() {
@@ -322,13 +291,8 @@
                 camera.srcObject = stream;
                 startBtn.disabled = true;
                 stopBtn.disabled = false;
-                cameraContainer.classList.add('active');
                 
-                // Inicializar Quagga após a câmera estar pronta
-                setTimeout(() => {
-                    initQuagga();
-                    Quagga.start();
-                }, 500);
+                Quagga.start();
                 
                 status.textContent = "Camera ativa - Posicione o código";
                 
@@ -346,7 +310,6 @@
             
             Quagga.stop();
             camera.srcObject = null;
-            cameraContainer.classList.remove('active');
             
             startBtn.disabled = false;
             stopBtn.disabled = true;
@@ -360,19 +323,49 @@
             currentZoom = Math.max(0.5, Math.min(3.0, currentZoom + delta));
             zoomLevel.textContent = currentZoom.toFixed(1) + "x";
             
-            // Aplicar zoom digital
+            // Aplicar zoom digital (simulação)
             camera.style.transform = `scale(${currentZoom})`;
-            camera.style.transformOrigin = 'center center';
             
-            console.log("Zoom ajustado para:", currentZoom + "x");
+            // Em dispositivos com zoom óptico, você pode usar:
+            // applyOpticalZoom(currentZoom);
+        }
+
+        // Função para aplicar zoom óptico (se suportado)
+        async function applyOpticalZoom(zoomLevel) {
+            if (!stream) return;
+            
+            const track = stream.getVideoTracks()[0];
+            const capabilities = track.getCapabilities();
+            
+            if (capabilities.zoom) {
+                try {
+                    await track.applyConstraints({
+                        advanced: [{ zoom: zoomLevel }]
+                    });
+                } catch (err) {
+                    console.warn("Zoom óptico não suportado:", err);
+                }
+            }
         }
 
         // Feedback sonoro
         function beep() {
             try {
-                // Método simples usando HTML Audio
-                const audio = new Audio("data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQQAAAAAAA==");
-                audio.play().catch(e => console.log("Áudio não pode ser reproduzido"));
+                const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                const oscillator = audioCtx.createOscillator();
+                const gainNode = audioCtx.createGain();
+                
+                oscillator.connect(gainNode);
+                gainNode.connect(audioCtx.destination);
+                
+                oscillator.frequency.value = 800;
+                oscillator.type = 'sine';
+                
+                gainNode.gain.setValueAtTime(0.3, audioCtx.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.5);
+                
+                oscillator.start(audioCtx.currentTime);
+                oscillator.stop(audioCtx.currentTime + 0.5);
             } catch (err) {
                 console.warn("Áudio não suportado");
             }
@@ -383,24 +376,12 @@
             if (document.hidden) {
                 Quagga.stop();
             } else if (stream) {
-                setTimeout(() => Quagga.start(), 300);
+                Quagga.start();
             }
         });
 
         // Limpar ao sair
         window.addEventListener('beforeunload', stopCamera);
-
-        // CORRIGIDO: Inicializar elementos visuais
-        document.addEventListener('DOMContentLoaded', function() {
-            console.log("DOM carregado - elementos devem estar visíveis");
-            // Forçar redesenho do overlay
-            setTimeout(() => {
-                scanOverlay.style.display = 'none';
-                setTimeout(() => {
-                    scanOverlay.style.display = 'block';
-                }, 100);
-            }, 500);
-        });
     </script>
 </body>
 </html>
