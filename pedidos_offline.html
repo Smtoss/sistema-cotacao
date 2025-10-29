@@ -1,0 +1,936 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cotação de Vendas - Offline (Corrigido)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        /* Configuração de Fonte e Fundo */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3ffef; 
+        }
+        /* Estilo para a tela principal, otimizado para mobile */
+        .view-container {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 16px;
+        }
+        .card {
+            width: 100%;
+            max-width: 500px;
+            background-color: #ffffff;
+            padding: 24px;
+            border-radius: 1rem;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+            border-top: 8px solid #10b981;
+        }
+        /* Estilo dos Botões Primários */
+        .btn-primary {
+            background-color: #10b981; /* Emerald 500 */
+            transition: all 0.2s;
+        }
+        .btn-primary:hover {
+            background-color: #059669; /* Emerald 600 */
+            transform: scale(1.02);
+            box-shadow: 0 4px 8px rgba(16, 185, 129, 0.3);
+        }
+        .overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(17, 24, 39, 0.95);
+            z-index: 50;
+            backdrop-filter: blur(4px);
+            overflow-y: auto;
+            display: none;
+            padding: 16px;
+        }
+        .overlay-content {
+            background-color: #ffffff;
+            border-radius: 1rem;
+            padding: 24px;
+            margin: 40px auto;
+            width: 100%;
+            max-width: 600px;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+            position: relative;
+        }
+        .search-result {
+            transition: all 0.3s ease;
+        }
+        .search-result:hover {
+            background-color: #f0fdf4;
+            transform: translateX(4px);
+        }
+    </style>
+</head>
+<body>
+    
+    <!-- Modal de Confirmação e Input (Substitui alert/confirm) -->
+    <div id="customModal" class="overlay hidden">
+        <div class="overlay-content max-w-sm">
+            <h3 id="modalTitle" class="text-xl font-bold text-gray-800 mb-4">Atenção</h3>
+            <p id="modalMessage" class="text-gray-600 mb-6"></p>
+            <input type="text" id="modalInput" placeholder="Digite aqui" class="w-full p-3 border border-gray-300 rounded-lg mb-4 hidden">
+            <div class="flex justify-end space-x-3">
+                <button id="modalCancelButton" class="px-4 py-2 text-gray-600 bg-gray-200 rounded-lg hover:bg-gray-300 transition">Cancelar</button>
+                <button id="modalConfirmButton" class="px-4 py-2 text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition">Confirmar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Overlay de Gerenciamento da Base de Dados -->
+    <div id="managementOverlay" class="overlay">
+        <div class="overlay-content">
+            <h2 class="text-2xl font-bold text-gray-800 mb-4 text-center">Gerenciar Base de Produtos</h2>
+            <p class="text-sm text-gray-500 mb-6 text-center">Base atual com <span id="currentProductCount" class="font-bold text-indigo-600">0</span> produtos.</p>
+            
+            <button onclick="toggleView('main')" 
+                class="absolute top-4 right-4 text-gray-500 hover:text-gray-900 transition duration-200">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+            </button>
+
+            <div class="space-y-6">
+                
+                <!-- 1. Importação por Arquivo CSV/TXT -->
+                <div class="border border-indigo-200 p-4 rounded-lg bg-indigo-50">
+                    <h3 class="text-lg font-semibold text-indigo-700 mb-3">1. Importar Arquivo Local (.csv ou .txt)</h3>
+                    <input type="file" id="fileInput" accept=".csv, .txt" class="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-indigo-100 file:text-indigo-700 hover:file:bg-indigo-200"/>
+                    <p class="text-xs text-gray-500 mt-2">Selecione um arquivo CSV/TXT. A importação é automática após a seleção.</p>
+                    <p class="text-xs text-red-600 font-semibold mt-1">Lembre-se: Use formato **ISO-8859-1 (ANSI)** para evitar erros de acentuação.</p>
+                </div>
+
+                <!-- 2. Limpar Base - CORRIGIDO: Chamada com Modal -->
+                <button id="clearDataButton" onclick="showConfirmationModal('Limpar Base', 'Tem certeza? Isto irá apagar TODOS os seus produtos importados (Inventário) permanentemente.', clearDatabase)"
+                    class="w-full bg-red-500 hover:bg-red-600 text-white font-semibold py-3 rounded-lg transition duration-200 shadow-md flex items-center justify-center">
+                    <svg class="w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M15 6V4c0-1-1-2-2-2h-2c-1 0-2 1-2 2v2"/></svg>
+                    Limpar Base Local (Apaga Todos os Produtos)
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Overlay de Opções/Lista de Cotação -->
+    <div id="optionsOverlay" class="overlay">
+        <div class="overlay-content">
+            <h2 class="text-2xl font-bold text-gray-800 mb-4 text-center">Itens Selecionados</h2>
+            
+            <button onclick="toggleView('main')" 
+                class="absolute top-4 right-4 text-gray-500 hover:text-gray-900 transition duration-200">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+            </button>
+            
+            <!-- Lista de Itens (Onde o Lixeira estava falhando) -->
+            <div id="selectedItemsList" class="divide-y divide-gray-200 mb-4 max-h-96 overflow-y-auto">
+                <!-- Itens serão renderizados aqui -->
+            </div>
+
+            <!-- Total da Cotação -->
+            <div class="bg-emerald-50 p-4 rounded-lg flex justify-between items-center mb-6 shadow-inner">
+                <span class="text-lg font-semibold text-gray-700">Total da Cotação:</span>
+                <span id="quoteTotal" class="text-2xl font-bold text-emerald-700">R$ 0,00</span>
+            </div>
+
+            <!-- Botões de Ação -->
+            <div class="flex flex-col gap-3">
+                <!-- Botão ENVIAR COTAÇÃO WhatsApp - CORRIGIDO: Fluxo de chamada garantido -->
+                <button id="exportAndShareButton" onclick="exportAndShare()"
+                    class="btn-primary w-full text-white font-semibold py-3 rounded-lg shadow-md flex items-center justify-center">
+                    <svg class="w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+                    ENVIAR COTAÇÃO (WhatsApp)
+                </button>
+                <!-- Botão Limpar Lista de Cotação - CORRIGIDO: Chamada com Modal -->
+                <button onclick="showConfirmationModal('Limpar Cotação', 'Tem certeza que deseja LIMPAR a lista de cotação atual?', clearQuote)"
+                    class="w-full bg-gray-500 hover:bg-gray-600 text-white font-semibold py-3 rounded-lg transition duration-200 shadow-md">
+                    Limpar Lista de Cotação
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tela Principal de Cotação -->
+    <div id="mainQuotationView" class="view-container">
+        <div class="card">
+            <h1 class="text-xl sm:text-2xl font-bold text-gray-800 mb-4 text-center">
+                Nova Cotação
+            </h1>
+            <p class="text-sm text-gray-500 mb-6 text-center">
+                <span id="mainProductCount" class="font-bold text-indigo-600">0</span> produtos carregados.
+                <button onclick="toggleView('management')" class="text-indigo-500 hover:text-indigo-700 font-semibold underline ml-1">Gerenciar Base</button>
+            </p>
+
+            <!-- Campo de Busca/Scanner -->
+            <div class="mb-4">
+                <label for="codeInput" class="block text-sm font-medium text-gray-700 mb-2 text-center">
+                    CÓDIGO DE BARRAS / BUSCA POR DESCRIÇÃO
+                </label>
+                <div class="flex gap-2">
+                    <input type="text" id="codeInput" placeholder="Digite ou Escaneie o Código" 
+                        class="flex-grow p-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 text-base text-center font-mono">
+                    
+                    <!-- Botão de Escaneamento (Câmera) - CORRIGIDO: Lógica robusta no JS -->
+                    <button id="cameraButton" onclick="handleCameraScan()"
+                        class="bg-indigo-500 hover:bg-indigo-600 text-white p-3 rounded-lg shadow-md flex items-center justify-center transition duration-200" title="Simular Leitura de Código de Barras / Câmera">
+                         <svg class="w-6 h-6" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 18V6"/><path d="M17 18V6"/><path d="M7 18V6"/><path d="M3 18V6"/><path d="M21 18V6"/></svg>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Resultados da Busca -->
+            <div id="searchResults" class="mb-4 max-h-64 overflow-y-auto border border-gray-200 rounded-lg hidden">
+                <div class="p-3 border-b border-gray-100 bg-gray-50">
+                    <p class="text-sm font-semibold text-gray-700">Resultados da Busca:</p>
+                </div>
+                <div id="resultsList" class="divide-y divide-gray-100">
+                    <!-- Resultados aparecem aqui -->
+                </div>
+            </div>
+
+            <div id="productDisplay" class="border border-dashed border-gray-300 p-4 rounded-lg bg-gray-50 transition-all duration-300 min-h-[150px] flex flex-col justify-center items-center text-center">
+                <p id="messageText" class="text-gray-500 italic">Digite o código do item para começar.</p>
+                
+                <!-- Dados do Produto (Visíveis quando encontrado) -->
+                <div id="productDetails" class="hidden w-full space-y-2">
+                    <p class="text-xl font-bold text-gray-800" id="displayDescricao"></p>
+                    <p class="text-sm text-gray-600">Cód.: <span id="displayCodigo" class="font-semibold"></span></p>
+                    <p class="text-3xl font-extrabold text-emerald-600" id="displayVLUnit"></p>
+                    <p class="text-sm text-gray-500">Unidade: <span id="displayUnidade" class="font-semibold text-gray-700">UN</span></p>
+
+                    <!-- Campo Quantidade -->
+                    <div class="pt-4">
+                        <label for="quantityInput" class="block text-sm font-medium text-gray-700 mb-1">QUANTIDADE</label>
+                        <input type="number" id="quantityInput" value="1" min="1" 
+                            class="w-24 p-2 border border-gray-300 rounded-lg text-center font-semibold text-lg mx-auto block focus:ring-indigo-500 focus:border-indigo-500">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Botão de Ação -->
+            <div class="mt-6 flex flex-col gap-3">
+                <button id="selectButton" onclick="addProductToQuote()" disabled
+                    class="btn-primary w-full text-white font-semibold py-3 rounded-lg shadow-xl text-lg disabled:opacity-50 disabled:cursor-not-allowed transition duration-200 flex items-center justify-center">
+                    <svg class="w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+                    SELECIONAR ITEM
+                </button>
+                
+                <!-- Botão OPÇÕES -->
+                <button onclick="toggleView('options')"
+                    class="w-full bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold py-3 rounded-lg transition duration-200 shadow-md flex items-center justify-center">
+                    <svg class="w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>
+                    OPÇÕES (<span id="quoteItemCount">0</span> itens na lista)
+                </button>
+            </div>
+        </div>
+
+        <!-- Mensagens de Alerta (Erro/Sucesso) -->
+        <div id="messageBox" class="fixed bottom-4 right-4 p-3 rounded-lg shadow-xl text-sm z-50 hidden transition-all duration-300"></div>
+    </div>
+
+    <script>
+        // --- VARIÁVEIS DE ESTADO ---
+        let productDatabase = []; // Base de inventário completa
+        let selectedItems = []; // Lista de itens na cotação atual
+        let foundProduct = null; // Produto atualmente exibido na tela
+
+        // --- REFERÊNCIAS DO DOM ---
+        const mainView = document.getElementById('mainQuotationView');
+        const optionsView = document.getElementById('optionsOverlay');
+        const managementView = document.getElementById('managementOverlay');
+        const codeInput = document.getElementById('codeInput');
+        const quantityInput = document.getElementById('quantityInput');
+        const selectButton = document.getElementById('selectButton');
+        const productDetailsDiv = document.getElementById('productDetails');
+        const messageText = document.getElementById('messageText');
+        const selectedItemsList = document.getElementById('selectedItemsList');
+        const quoteTotalSpan = document.getElementById('quoteTotal');
+        const quoteItemCountSpan = document.getElementById('quoteItemCount');
+        const messageBox = document.getElementById('messageBox');
+        const fileInput = document.getElementById('fileInput');
+        const currentProductCountSpan = document.getElementById('currentProductCount');
+        const mainProductCountSpan = document.getElementById('mainProductCount');
+        const searchResults = document.getElementById('searchResults');
+        const resultsList = document.getElementById('resultsList');
+        
+        // Modal Customizado
+        const customModal = document.getElementById('customModal');
+        const modalTitle = document.getElementById('modalTitle');
+        const modalMessage = document.getElementById('modalMessage');
+        const modalInput = document.getElementById('modalInput');
+        const modalCancelButton = document.getElementById('modalCancelButton');
+        const modalConfirmButton = document.getElementById('modalConfirmButton');
+
+        // --- FUNÇÕES DE UTILIDADE DE UI ---
+
+        function showMessage(message, type) {
+            messageBox.textContent = message;
+            messageBox.className = 'fixed bottom-4 right-4 p-3 rounded-lg shadow-xl text-sm z-50 transition-all duration-300';
+            
+            if (type === 'success') {
+                messageBox.classList.add('bg-green-500', 'text-white', 'block');
+            } else if (type === 'error') {
+                messageBox.classList.add('bg-red-500', 'text-white', 'block');
+            } else if (type === 'warning' || type === 'info') {
+                 messageBox.classList.add('bg-indigo-500', 'text-white', 'block');
+            }
+
+            setTimeout(() => {
+                messageBox.classList.remove('block');
+                messageBox.classList.add('hidden');
+            }, 3000);
+        }
+
+        function toggleView(viewName) {
+            mainView.style.display = 'none';
+            optionsView.style.display = 'none';
+            managementView.style.display = 'none';
+            
+            if (viewName === 'main') {
+                mainView.style.display = 'flex';
+                // Certifica que o produto encontrado é limpo na troca de tela
+                findProduct('');
+            } else if (viewName === 'options') {
+                renderQuoteList();
+                optionsView.style.display = 'block';
+            } else if (viewName === 'management') {
+                updateProductCountUI();
+                managementView.style.display = 'block';
+            }
+        }
+        
+        function updateProductCountUI() {
+            currentProductCountSpan.textContent = productDatabase.length;
+            mainProductCountSpan.textContent = productDatabase.length;
+        }
+
+        /**
+         * Exibe um modal customizado para confirmação ou input de texto.
+         * Esta é a função crítica para resolver os problemas de botões que "não faziam nada".
+         * @param {string} title - Título do modal.
+         * @param {string} message - Mensagem do modal.
+         * @param {function} onConfirm - Função a ser executada ao confirmar (recebe o valor do input se for um campo).
+         * @param {boolean} needsInput - Se deve exibir um campo de texto.
+         */
+        function showConfirmationModal(title, message, onConfirm, needsInput = false, placeholder = "Digite aqui...") {
+            modalTitle.textContent = title;
+            modalMessage.textContent = message;
+            
+            if (needsInput) {
+                modalInput.placeholder = placeholder;
+                modalInput.classList.remove('hidden');
+                modalInput.value = '';
+                modalConfirmButton.textContent = 'Confirmar';
+            } else {
+                modalInput.classList.add('hidden');
+                modalConfirmButton.textContent = 'Sim, Confirmar';
+            }
+
+            customModal.classList.remove('hidden');
+
+            // Limpa listeners anteriores
+            modalConfirmButton.onclick = null;
+            modalCancelButton.onclick = null;
+
+            modalConfirmButton.onclick = () => {
+                const inputValue = needsInput ? modalInput.value.trim() : true;
+                if (needsInput && !inputValue) {
+                    showMessage("O campo não pode ser vazio.", "error");
+                    return; // Permanece no modal se for um input obrigatório
+                }
+                customModal.classList.add('hidden');
+                onConfirm(inputValue);
+            };
+
+            modalCancelButton.onclick = () => {
+                customModal.classList.add('hidden');
+            };
+        }
+
+        // --- PERSISTÊNCIA E DADOS (localStorage) ---
+
+        function loadDatabase() {
+            try {
+                const storedData = localStorage.getItem('cotacao_product_database');
+                if (storedData) {
+                    productDatabase = JSON.parse(storedData);
+                }
+            } catch (e) {
+                console.error("Erro ao carregar base de dados:", e);
+                productDatabase = [];
+                showMessage('Erro ao carregar a base de dados local.', 'error');
+            }
+        }
+        
+        function saveLocalData() {
+            try {
+                localStorage.setItem('cotacao_product_database', JSON.stringify(productDatabase));
+                updateProductCountUI();
+            } catch (e) {
+                console.error("Erro ao salvar dados no localStorage:", e);
+                showMessage("Aviso: Falha ao salvar os dados localmente. Memória cheia?", 'error');
+            }
+        }
+
+        function loadQuote() {
+            try {
+                const storedQuote = localStorage.getItem('cotacao_current_quote');
+                if (storedQuote) {
+                    selectedItems = JSON.parse(storedQuote);
+                }
+            } catch (e) {
+                 console.error("Erro ao carregar cotação salva:", e);
+            }
+        }
+        
+        function saveQuote() {
+            localStorage.setItem('cotacao_current_quote', JSON.stringify(selectedItems));
+            quoteItemCountSpan.textContent = selectedItems.length;
+        }
+        
+        // --- PARSING DE DADOS (Manuseio do CSV/TXT) ---
+
+        function parseDataInput(data) {
+            const lines = data.trim().split('\n').filter(line => line.trim() !== '');
+            if (lines.length < 2) throw new Error("A base de dados deve ter pelo menos um cabeçalho e uma linha de produto.");
+
+            let delimiter = ';';
+            if (!lines[0].includes(';')) {
+                if (lines[0].includes(',')) {
+                    delimiter = ',';
+                } else if (lines[0].includes('\t')) {
+                    delimiter = '\t';
+                } else {
+                    throw new Error("Delimitador não reconhecido. Use ponto e vírgula (;) ou vírgula (,) ou TAB.");
+                }
+            }
+
+            const cleanHeader = (header) => {
+                let cleaned = header.trim().toUpperCase();
+                // 1. Remove acentos (essencial para DESCRIÇÃO -> DESCRICAO)
+                cleaned = cleaned.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+                // 2. Remove caracteres especiais (hífens, pontos, barras)
+                return cleaned.replace(/[^A-Z0-9]/g, ''); 
+            };
+
+            const rawHeaders = lines[0].split(delimiter).map(cleanHeader);
+            const dataLines = lines.slice(1);
+
+            const products = [];
+            let codigoIndex = -1;
+            let descricaoIndex = -1;
+            let vlUnitIndex = -1;
+            let unidadeIndex = -1;
+
+            rawHeaders.forEach((header, index) => {
+                if (codigoIndex === -1 && (header === 'CODIGO' || header.startsWith('CODIGO') || header.startsWith('CODE'))) { 
+                    codigoIndex = index;
+                }
+                if (descricaoIndex === -1 && (header.includes('DESCRIC') || header.includes('DESCRIP'))) { 
+                    descricaoIndex = index;
+                }
+                if (vlUnitIndex === -1 && (header.includes('VLUNIT') || header.includes('VALORUNIT') || (header.includes('VALOR') && !header.includes('TOTAL')))) { 
+                    vlUnitIndex = index;
+                }
+                if (unidadeIndex === -1 && (header.includes('UNID'))) { 
+                    unidadeIndex = index;
+                }
+            });
+            
+            if (codigoIndex === -1 || descricaoIndex === -1 || vlUnitIndex === -1) {
+                throw new Error("Não foi possível encontrar as colunas CODIGO, DESCRIÇÃO ou VLUNIT (Valor Unitário). Verifique se o cabeçalho está correto.");
+            }
+
+            dataLines.forEach((line, lineIndex) => {
+                const values = line.split(delimiter).map(v => v.trim());
+
+                if (values.length !== rawHeaders.length) {
+                    return;
+                }
+                
+                const rawCodigo = values[codigoIndex] || '';
+                // Remove pontos e vírgulas do código (comum em códigos de barras numéricos)
+                const cleanCodigo = String(rawCodigo).trim().replace(/[.,]/g, ''); 
+
+                const product = {
+                    codigo: cleanCodigo, 
+                    descricao: values[descricaoIndex] || '',
+                    vlUnit: values[vlUnitIndex] || '0.00',
+                    unidade: unidadeIndex !== -1 ? (values[unidadeIndex] || 'UN') : 'UN'
+                };
+                
+                products.push(product);
+            });
+            
+            if (products.length === 0) {
+                 throw new Error("Não foi possível extrair produtos válidos. Verifique o formato do cabeçalho e delimitador.");
+            }
+
+            return products;
+        }
+        
+        // --- HANDLERS DE IMPORTAÇÃO (Gerenciamento) ---
+
+        async function handleDataImport(data) {
+            if (!data) {
+                showMessage('Nenhum dado fornecido para importação.', 'error');
+                return;
+            }
+
+            try {
+                showMessage('Processando dados...', 'info'); 
+                await new Promise(resolve => setTimeout(resolve, 50)); 
+
+                const newProducts = parseDataInput(data);
+
+                productDatabase = newProducts;
+                
+                saveLocalData();
+                showMessage(`Importação concluída! ${newProducts.length} produtos carregados na base.`, 'success');
+                
+                fileInput.value = '';
+                toggleView('main');
+
+            } catch (error) {
+                console.error('[CONSOLE_ERROR] Erro durante a importação de dados:', error);
+                const errorMessage = error.message.includes('cabeçalho') || error.message.includes('válidos') ? error.message : "Ocorreu um erro desconhecido ao processar os dados. Verifique o console para mais detalhes.";
+                showMessage(`ERRO na Importação: ${errorMessage}`, 'error');
+            }
+        }
+
+        // Leitura do arquivo com codificação ISO-8859-1 (ANSI)
+        fileInput.addEventListener('change', () => {
+            const file = fileInput.files[0];
+            if (!file) {
+                showMessage('Selecione um arquivo CSV ou TXT.', 'error');
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                handleDataImport(e.target.result);
+            };
+            reader.onerror = function() {
+                showMessage('Erro ao ler o arquivo selecionado.', 'error');
+            };
+            // Lê o conteúdo do arquivo como texto, forçando a codificação para ANSI/ISO-8859-1
+            reader.readAsText(file, 'ISO-8859-1'); 
+        });
+
+        // FUNÇÃO DE LIMPEZA DA BASE LOCAL - CORRIGIDO: Retirado o window. para evitar conflito com a chamada do modal
+        function clearDatabase() {
+            productDatabase = []; 
+            localStorage.removeItem('cotacao_product_database'); 
+            updateProductCountUI();
+            showMessage('Base de dados local limpa com sucesso!', 'success');
+            toggleView('main');
+        }
+        
+        // --- FUNÇÕES DA TELA PRINCIPAL (Cotação) ---
+
+        /**
+         * CORREÇÃO: Lógica de Simulação de Câmera/Scanner mais robusta,
+         * tratando "Acesso negado" com feedback adequado.
+         */
+        window.handleCameraScan = async function() {
+            const simulatedCode = 'P-SCAN-001';
+            let message = '';
+            let type = 'success';
+            
+            try {
+                // Tenta pedir acesso (pode falhar no iframe, mas testa a permissão real)
+                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                
+                // Se funcionar, para a stream e simula a leitura
+                stream.getTracks().forEach(track => track.stop());
+                
+                message = 'Câmera/Scanner ativado! Simulação de leitura: ' + simulatedCode;
+                type = 'success';
+                
+            } catch (err) {
+                // Tratamento de erro para negação/indisponibilidade
+                if (err.name === 'NotAllowedError' || err.name === 'SecurityError') {
+                    message = 'Acesso à câmera negado. Simulação de leitura forçada.';
+                } else if (err.name === 'NotFoundError') {
+                     message = 'Nenhuma câmera encontrada. Simulação forçada.';
+                } else {
+                     message = 'Falha ao tentar abrir o scanner (simulação forçada).';
+                }
+                type = 'warning';
+                console.warn("Erro ao acessar a câmera (Simulando leitura):", err);
+            }
+            
+            // SIMULAÇÃO DE LEITURA (Mantém o fluxo principal)
+            codeInput.value = simulatedCode;
+            findProduct(simulatedCode);
+            showMessage(message, type);
+        }
+
+        /**
+         * Busca o produto na base de dados e exibe na tela.
+         * CORREÇÃO: Implementação da busca SQL Like
+         */
+        function findProduct(code) {
+            const cleanCode = String(code).trim().replace(/[.,]/g, '');
+            foundProduct = null;
+            
+            // Primeiro tenta busca exata por código
+            let product = productDatabase.find(p => String(p.codigo).toUpperCase() === cleanCode.toUpperCase());
+
+            if (!product && cleanCode.length > 2) {
+                // Busca SQL Like por Descrição (parcial) se a busca por código falhar
+                const normalizedCode = cleanCode.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+                const searchFragments = normalizedCode.split(' ').filter(frag => frag.length >= 2);
+                
+                if (searchFragments.length > 0) {
+                    product = productDatabase.find(p => {
+                        const cleanDesc = String(p.descricao).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+                        // TODOS os fragmentos devem estar presentes na descrição
+                        return searchFragments.every(fragment => cleanDesc.includes(fragment));
+                    });
+                }
+                
+                // Se encontrou por SQL Like, mostra os resultados
+                if (product) {
+                    const allMatches = productDatabase.filter(p => {
+                        const cleanDesc = String(p.descricao).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+                        return searchFragments.every(fragment => cleanDesc.includes(fragment));
+                    });
+                    
+                    if (allMatches.length > 1) {
+                        showSearchResults(allMatches, searchFragments);
+                        return; // Não seleciona automaticamente quando há múltiplos resultados
+                    }
+                }
+            }
+            
+            foundProduct = product;
+
+            if (foundProduct) {
+                messageText.classList.add('hidden');
+                productDetailsDiv.classList.remove('hidden');
+                selectButton.disabled = false;
+                hideSearchResults();
+                
+                let rawValue = foundProduct.vlUnit || '0.00';
+                // Garante que o valor é tratado como ponto decimal para o JS
+                let value = parseFloat(String(rawValue).replace(',', '.')); 
+                
+                document.getElementById('displayDescricao').textContent = foundProduct.descricao || 'Produto sem descrição';
+                document.getElementById('displayCodigo').textContent = foundProduct.codigo || 'N/A';
+                document.getElementById('displayVLUnit').textContent = isNaN(value) ? 'N/A' : value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+                document.getElementById('displayUnidade').textContent = foundProduct.unidade || 'UN';
+                quantityInput.value = 1;
+                quantityInput.focus();
+
+            } else {
+                messageText.classList.remove('hidden');
+                productDetailsDiv.classList.add('hidden');
+                selectButton.disabled = true;
+                messageText.textContent = cleanCode ? `Código/Descrição "${code}" não encontrado na base.` : `Digite o código do item para começar.`;
+                hideSearchResults();
+            }
+        }
+
+        // Funções para exibir resultados da busca SQL Like
+        function showSearchResults(results, searchFragments) {
+            resultsList.innerHTML = '';
+            
+            results.forEach(product => {
+                const resultElement = document.createElement('div');
+                resultElement.className = 'search-result p-3 cursor-pointer hover:bg-green-50';
+                resultElement.innerHTML = `
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <p class="font-semibold text-gray-800">${highlightSearchFragments(product.descricao, searchFragments)}</p>
+                            <p class="text-xs text-gray-600">Cód: ${product.codigo} | R$ ${product.vlUnit}</p>
+                        </div>
+                        <button onclick="selectProductFromSearch('${product.codigo}')" 
+                                class="bg-indigo-500 text-white px-3 py-1 rounded text-sm hover:bg-indigo-600 transition">
+                            Selecionar
+                        </button>
+                    </div>
+                `;
+                resultsList.appendChild(resultElement);
+            });
+            
+            searchResults.classList.remove('hidden');
+        }
+
+        function highlightSearchFragments(text, fragments) {
+            let highlightedText = text.toUpperCase();
+            fragments.forEach(fragment => {
+                const regex = new RegExp(`(${fragment})`, 'gi');
+                highlightedText = highlightedText.replace(regex, '<span class="bg-yellow-200 font-bold">$1</span>');
+            });
+            return highlightedText;
+        }
+
+        function hideSearchResults() {
+            searchResults.classList.add('hidden');
+        }
+
+        window.selectProductFromSearch = function(code) {
+            const product = productDatabase.find(p => p.codigo === code);
+            if (product) {
+                codeInput.value = code;
+                hideSearchResults();
+                foundProduct = product;
+                
+                messageText.classList.add('hidden');
+                productDetailsDiv.classList.remove('hidden');
+                selectButton.disabled = false;
+                
+                let rawValue = foundProduct.vlUnit || '0.00';
+                let value = parseFloat(String(rawValue).replace(',', '.')); 
+                
+                document.getElementById('displayDescricao').textContent = foundProduct.descricao || 'Produto sem descrição';
+                document.getElementById('displayCodigo').textContent = foundProduct.codigo || 'N/A';
+                document.getElementById('displayVLUnit').textContent = isNaN(value) ? 'N/A' : value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+                document.getElementById('displayUnidade').textContent = foundProduct.unidade || 'UN';
+                quantityInput.value = 1;
+                quantityInput.focus();
+                
+                showMessage(`Produto "${foundProduct.descricao}" selecionado!`, 'success');
+            }
+        }
+
+        codeInput.addEventListener('change', (e) => {
+            const code = e.target.value.trim();
+            if (code) {
+                findProduct(code);
+            }
+            e.target.value = ''; 
+        });
+
+        /**
+         * Adiciona o produto exibido na tela à lista de cotação.
+         */
+        window.addProductToQuote = function() {
+            if (!foundProduct) {
+                showMessage('Nenhum produto válido selecionado. Busque um item primeiro.', 'error');
+                return;
+            }
+
+            const quantity = parseInt(quantityInput.value, 10);
+            if (isNaN(quantity) || quantity <= 0) {
+                showMessage('Quantidade deve ser um número positivo.', 'error');
+                return;
+            }
+            
+            // Cria um novo item para a cotação
+            const quoteItem = {
+                ...foundProduct, 
+                id: crypto.randomUUID(), // ID único para o item na lista de cotação
+                quantity: quantity
+            };
+
+            selectedItems.push(quoteItem);
+            saveQuote();
+            showMessage(`Adicionado: ${quantity}x ${foundProduct.descricao}`, 'success');
+            
+            findProduct(''); // Limpa a tela de exibição para o próximo scan
+            codeInput.focus();
+        }
+
+        // --- FUNÇÕES DA TELA DE OPÇÕES (Cotação) ---
+        
+        /**
+         * Função intermediária para a remoção com modal (Lixeira) - CORRIGIDA: Lógica garantida.
+         */
+        window.removeItemConfirmation = function(id, description) {
+             showConfirmationModal(
+                'Excluir Item', 
+                `Deseja realmente excluir '${description}' da lista?`, 
+                () => removeItemFromQuote(id)
+            );
+        }
+
+        function renderQuoteList() {
+            selectedItemsList.innerHTML = '';
+            let total = 0;
+
+            if (selectedItems.length === 0) {
+                selectedItemsList.innerHTML = '<p class="text-center text-gray-500 py-4">Nenhum item selecionado para esta cotação.</p>';
+                quoteTotalSpan.textContent = 'R$ 0,00';
+                document.getElementById('exportAndShareButton').disabled = true;
+                return;
+            }
+            document.getElementById('exportAndShareButton').disabled = false;
+
+            selectedItems.forEach(item => {
+                let rawValue = item.vlUnit || '0.00';
+                // Garante que o valor é um número (troca , por .)
+                const value = parseFloat(String(rawValue).replace(',', '.'));
+                
+                const itemTotal = isNaN(value) ? 0 : value * item.quantity;
+                total += itemTotal;
+                
+                const itemHTML = `
+                    <div class="quote-item p-3 flex justify-between items-center transition duration-150 border-b border-gray-100">
+                        <div class="flex-grow min-w-0 pr-3">
+                            <p class="text-base font-semibold text-gray-800">${item.descricao}</p>
+                            <p class="text-xs text-gray-600">Cód.: ${item.codigo} | Qtd: <span class="font-bold text-indigo-600">${item.quantity}</span></p>
+                            <p class="text-sm font-bold text-emerald-700">Total: ${itemTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
+                        </div>
+                        <!-- CORREÇÃO DA LIXEIRA: Usa data-id para o Listener Delegado -->
+                        <button data-item-id="${item.id}" data-item-desc="${item.descricao}" class="remove-item-btn text-red-600 hover:text-red-900 transition duration-150 p-2 rounded-full hover:bg-red-100 flex-shrink-0" title="Remover Item">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>
+                        </button>
+                    </div>
+                `;
+                
+                selectedItemsList.insertAdjacentHTML('beforeend', itemHTML);
+            });
+
+            quoteTotalSpan.textContent = total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+        }
+        
+        // CORREÇÃO DA LIXEIRA: Listener de evento delegado (solução definitiva para o problema)
+        selectedItemsList.addEventListener('click', (event) => {
+            const button = event.target.closest('.remove-item-btn');
+            if (button) {
+                const itemId = button.getAttribute('data-item-id');
+                const itemDesc = button.getAttribute('data-item-desc');
+                
+                if (itemId && itemDesc) {
+                    // Chama a função que exibirá o modal de confirmação
+                    window.removeItemConfirmation(itemId, itemDesc);
+                } else {
+                    showMessage('Erro ao identificar item para exclusão.', 'error');
+                }
+            }
+        });
+
+        // Remoção de item. Usa o ID único.
+        function removeItemFromQuote(id) {
+            selectedItems = selectedItems.filter(item => item.id !== id);
+            saveQuote();
+            renderQuoteList();
+            showMessage('Item removido da cotação.', 'info');
+        }
+
+        // FUNÇÃO DE LIMPEZA DA COTAÇÃO - CORRIGIDO: Retirado o window. para evitar conflito com a chamada do modal
+        function clearQuote() {
+            if (selectedItems.length === 0) {
+                showMessage('A lista já está vazia.', 'info');
+                return;
+            }
+            selectedItems = [];
+            localStorage.removeItem('cotacao_current_quote');
+            saveQuote(); 
+            renderQuoteList();
+            showMessage('Lista de cotação limpa com sucesso!', 'success');
+            // Não volta para o main para permitir ver o total zerado no options
+        }
+        
+        /**
+         * Exporta e Compartilha (Botão principal de Opções) - CORRIGIDO: Fluxo de chamada garantido.
+         */
+        window.exportAndShare = function() {
+            if (selectedItems.length === 0) {
+                showMessage('Adicione itens antes de enviar a cotação.', 'error');
+                return;
+            }
+
+            // 1. Pede o nome do cliente usando o modal customizado
+            showConfirmationModal(
+                'Enviar Cotação', 
+                'Por favor, digite o nome do cliente para esta cotação:', 
+                processExportAndShare, 
+                true, // Needs Input
+                "Nome do Cliente (Obrigatório)"
+            );
+        }
+
+        function processExportAndShare(clientName) {
+            if (!clientName) {
+                // Se o input for vazio, a chamada do showConfirmationModal já impede a execução (se tiver o check de input não vazio)
+                return; 
+            }
+
+            const now = new Date();
+            const filenameDate = `${String(now.getDate()).padStart(2, '0')}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getFullYear()).slice(2)}`;
+            const filenameTime = `${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}`;
+            const filename = `Cotacao-${clientName.replace(/[^a-zA-Z0-9]/g, '_')}-${filenameDate}-${filenameTime}.csv`;
+            
+            // --- Geração do CSV ---
+            const csvRows = [];
+            const headers = ['Cliente', 'Codigo', 'Descricao', 'Quantidade', 'Valor_Unitario', 'Valor_Total_Item'];
+            csvRows.push(headers.join(';'));
+
+            let totalQuoteValue = 0;
+
+            selectedItems.forEach(item => {
+                let rawValue = item.vlUnit || '0.00';
+                const value = parseFloat(String(rawValue).replace(',', '.'));
+                const itemTotal = isNaN(value) ? 0 : value * item.quantity;
+                totalQuoteValue += itemTotal;
+
+                // Remove delimitadores do CSV para evitar quebras
+                const safeDescricao = item.descricao.replace(/;/g, ',').replace(/"/g, '""'); 
+
+                const row = [
+                    clientName.replace(/;/g, ',').replace(/"/g, '""'), 
+                    item.codigo,
+                    safeDescricao, 
+                    item.quantity,
+                    String(isNaN(value) ? '0.00' : value.toFixed(2)).replace('.', ','), 
+                    String(itemTotal.toFixed(2)).replace('.', ',') 
+                ];
+                csvRows.push(row.join(';'));
+            });
+            
+             csvRows.push(['', '', 'TOTAL DA COTAÇÃO', '', '', String(totalQuoteValue.toFixed(2)).replace('.', ',')].join(';'));
+
+            // ISO-8859-1 (ANSI) é crucial para que o Excel abra o CSV corretamente no Brasil.
+            const csvContent = "\ufeff" + csvRows.join('\n'); // Adiciona BOM para forçar UTF-8 no Excel
+
+            // --- Download do CSV ---
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            
+            if (link.download !== undefined) { 
+                const url = URL.createObjectURL(blob);
+                link.setAttribute('href', url);
+                link.setAttribute('download', filename);
+                link.style.visibility = 'hidden';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            }
+            
+            // --- Geração da Mensagem WhatsApp ---
+            const whatsappMessage = `*COTAÇÃO - ${clientName.toUpperCase()}*\n\n`
+                                  + `*Itens:* ${selectedItems.length}\n`
+                                  + `*Total:* ${totalQuoteValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}\n\n`
+                                  + `Os detalhes estão no arquivo (*${filename}*), que foi salvo no seu dispositivo. Favor anexar como documento e enviar!`;
+
+            const whatsappLink = `whatsapp://send?text=${encodeURIComponent(whatsappMessage)}`;
+            
+            // --- Confirmação e Abertura do WhatsApp ---
+            showMessage('CSV salvo! Abrindo WhatsApp para envio...', 'success');
+            
+            setTimeout(() => {
+                // Tenta abrir o WhatsApp
+                window.location.href = whatsappLink;
+            }, 500); 
+        }
+
+        // --- INICIALIZAÇÃO ---
+        window.onload = () => {
+            loadDatabase();
+            loadQuote();
+            updateProductCountUI();
+            toggleView('main');
+            codeInput.focus();
+        };
+    </script>
+</body>
+</html>
