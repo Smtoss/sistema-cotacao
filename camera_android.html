@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Leitor de Código de Barras</title>
+    <title>Leitor Code 128 - Alta Densidade</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/quagga/0.12.1/quagga.min.js"></script>
     <style>
         * {
@@ -14,17 +14,17 @@
 
         body {
             font-family: Arial, sans-serif;
-            background: #f0f0f0;
             padding: 20px;
+            background: #f5f5f5;
         }
 
         .container {
-            max-width: 500px;
+            max-width: 600px;
             margin: 0 auto;
             background: white;
-            border-radius: 15px;
             padding: 20px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
         }
 
         h1 {
@@ -33,14 +33,18 @@
             color: #333;
         }
 
+        .camera-section {
+            position: relative;
+            margin: 20px 0;
+        }
+
         #camera-container {
             position: relative;
             width: 100%;
             height: 300px;
             background: #000;
-            border-radius: 10px;
+            border-radius: 8px;
             overflow: hidden;
-            margin-bottom: 20px;
         }
 
         #camera {
@@ -49,257 +53,323 @@
             object-fit: cover;
         }
 
-        #scan-overlay {
+        #scan-area {
             position: absolute;
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            width: 80%;
-            height: 120px;
-            border: 3px solid #00ff00;
-            background: rgba(0, 255, 0, 0.1);
-            border-radius: 10px;
-            transition: all 0.3s ease;
-        }
-
-        #scan-overlay.scanning {
-            border-color: #ff0000;
-            background: rgba(255, 0, 0, 0.1);
-            animation: pulse 1.5s infinite;
-        }
-
-        #scan-overlay.ready {
-            border-color: #00ff00;
-            background: rgba(0, 255, 0, 0.1);
-        }
-
-        @keyframes pulse {
-            0% { opacity: 1; }
-            50% { opacity: 0.5; }
-            100% { opacity: 1; }
-        }
-
-        .instructions {
-            text-align: center;
-            margin: 15px 0;
-            color: #666;
-            font-size: 14px;
-        }
-
-        .controls {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 15px;
-        }
-
-        button {
-            flex: 1;
-            padding: 12px;
-            border: none;
-            border-radius: 8px;
-            background: #007bff;
-            color: white;
-            font-size: 16px;
-            cursor: pointer;
-            transition: background 0.3s;
-        }
-
-        button:hover {
-            background: #0056b3;
-        }
-
-        button:disabled {
-            background: #ccc;
-            cursor: not-allowed;
-        }
-
-        #result {
-            margin-top: 15px;
-            padding: 15px;
-            background: #f8f9fa;
-            border-radius: 8px;
-            border-left: 4px solid #007bff;
+            width: 90%;
+            height: 150px;
+            border: 3px solid #4CAF50;
+            background: rgba(76, 175, 80, 0.1);
+            z-index: 10;
         }
 
         .zoom-controls {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 10px;
-            margin: 10px 0;
+            text-align: center;
+            margin: 15px 0;
         }
 
         .zoom-btn {
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            background: #007bff;
+            padding: 10px 20px;
+            margin: 0 5px;
+            background: #2196F3;
             color: white;
             border: none;
-            font-size: 18px;
+            border-radius: 5px;
             cursor: pointer;
+            font-size: 16px;
         }
 
-        .zoom-level {
+        .zoom-btn:hover {
+            background: #1976D2;
+        }
+
+        .zoom-display {
+            display: inline-block;
+            margin: 0 15px;
             font-weight: bold;
             color: #333;
         }
 
+        .config-panel {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+        }
+
+        .config-item {
+            margin: 10px 0;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #555;
+        }
+
+        select, input {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+
+        .results {
+            margin-top: 20px;
+            padding: 15px;
+            background: #e8f5e8;
+            border-radius: 8px;
+            border-left: 4px solid #4CAF50;
+        }
+
+        .debug {
+            margin-top: 10px;
+            padding: 10px;
+            background: #fff3cd;
+            border-radius: 5px;
+            font-size: 12px;
+            color: #856404;
+        }
+
         .status {
             text-align: center;
+            padding: 10px;
             margin: 10px 0;
+            border-radius: 5px;
             font-weight: bold;
         }
 
         .status.ready {
-            color: #28a745;
+            background: #d4edda;
+            color: #155724;
         }
 
-        .status.scanning {
-            color: #dc3545;
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>📷 Leitor de Código de Barras</h1>
+        <h1>🔍 Leitor Code 128 - Códigos de Alta Densidade</h1>
         
-        <div class="instructions">
-            Posicione o código de barras na área verde abaixo
+        <div class="config-panel">
+            <h3>⚙️ Configurações do Leitor</h3>
+            
+            <div class="config-item">
+                <label for="resolution">Resolução de Processamento:</label>
+                <select id="resolution">
+                    <option value="high">Alta (Recomendado para códigos densos)</option>
+                    <option value="medium">Média</option>
+                    <option value="low">Baixa</option>
+                </select>
+            </div>
+
+            <div class="config-item">
+                <label for="patchSize">Tamanho de Análise:</label>
+                <select id="patchSize">
+                    <option value="x-large">X-Large (Melhor para códigos finos)</option>
+                    <option value="large">Large</option>
+                    <option value="medium">Medium</option>
+                    <option value="small">Small</option>
+                </select>
+            </div>
+
+            <div class="config-item">
+                <label for="frequency">Frequência de Verificação:</label>
+                <select id="frequency">
+                    <option value="5">Muito Alta (5ms)</option>
+                    <option value="10">Alta (10ms)</option>
+                    <option value="20" selected>Normal (20ms)</option>
+                    <option value="50">Baixa (50ms)</option>
+                </select>
+            </div>
         </div>
 
-        <div class="status ready" id="status">Pronto para escanear</div>
+        <div class="camera-section">
+            <div id="camera-container">
+                <video id="camera" autoplay playsinline></video>
+                <div id="scan-area"></div>
+            </div>
 
-        <div class="zoom-controls">
-            <button class="zoom-btn" onclick="changeZoom(-0.2)">-</button>
-            <span class="zoom-level" id="zoomLevel">1.0x</span>
-            <button class="zoom-btn" onclick="changeZoom(0.2)">+</button>
+            <div class="zoom-controls">
+                <button class="zoom-btn" onclick="adjustZoom(-0.3)">🔍 -</button>
+                <span class="zoom-display">Zoom: <span id="zoomLevel">1.0x</span></span>
+                <button class="zoom-btn" onclick="adjustZoom(0.3)">🔍 +</button>
+            </div>
+
+            <div class="status ready" id="status">Pronto para iniciar</div>
+
+            <div style="text-align: center; margin: 15px 0;">
+                <button class="zoom-btn" onclick="initCamera()" style="background: #4CAF50;">🎥 Iniciar Câmera</button>
+                <button class="zoom-btn" onclick="stopCamera()" style="background: #f44336;">⏹ Parar</button>
+            </div>
         </div>
 
-        <div id="camera-container">
-            <video id="camera" autoplay playsinline></video>
-            <div id="scan-overlay" class="ready"></div>
+        <div class="results">
+            <h3>📊 Resultado da Leitura:</h3>
+            <div id="result">Aguardando leitura...</div>
+            <div class="debug" id="debugInfo"></div>
         </div>
 
-        <div class="controls">
-            <button id="startBtn" onclick="startCamera()">🎥 Iniciar Câmera</button>
-            <button id="stopBtn" onclick="stopCamera()" disabled>⏹ Parar</button>
-        </div>
-
-        <div id="result">
-            <strong>Resultado:</strong> <span id="resultText">Nenhum código lido ainda</span>
-        </div>
-
-        <div class="instructions">
-            Dica: Mantenha o código estável e bem iluminado dentro da área verde
+        <div style="margin-top: 20px; padding: 15px; background: #e3f2fd; border-radius: 8px;">
+            <h4>💡 Dicas para Códigos de Alta Densidade:</h4>
+            <ul>
+                <li>Use <strong>Zoom 1.5x a 2.0x</strong> para códigos com barras muito finas</li>
+                <li>Mantenha boa iluminação no código</li>
+                <li>Posicione o código paralelo à câmera</li>
+                <li>Configure "Resolução Alta" e "Tamanho X-Large" no painel acima</li>
+            </ul>
         </div>
     </div>
 
     <script>
         let stream = null;
         let currentZoom = 1.0;
-        let isScanning = false;
+        let isInitialized = false;
 
-        // Elementos DOM
         const camera = document.getElementById('camera');
-        const scanOverlay = document.getElementById('scan-overlay');
-        const startBtn = document.getElementById('startBtn');
-        const stopBtn = document.getElementById('stopBtn');
-        const resultText = document.getElementById('resultText');
         const status = document.getElementById('status');
+        const result = document.getElementById('result');
+        const debugInfo = document.getElementById('debugInfo');
         const zoomLevel = document.getElementById('zoomLevel');
 
-        // Inicializar Quagga
-        Quagga.init({
-            inputStream: {
-                name: "Live",
-                type: "LiveStream",
-                target: camera,
-                constraints: {
-                    width: 640,
-                    height: 480,
-                    facingMode: "environment" // Usar câmera traseira
-                }
-            },
-            decoder: {
-                readers: ["code_128_reader"]
-            },
-            locator: {
-                patchSize: "medium",
-                halfSample: true
-            },
-            locate: true,
-            frequency: 10
-        }, function(err) {
-            if (err) {
-                console.error("Erro ao inicializar Quagga:", err);
-                resultText.textContent = "Erro ao inicializar leitor: " + err.message;
+        // Configurações adaptáveis para códigos densos
+        function getQuaggaConfig() {
+            const resolution = document.getElementById('resolution').value;
+            const patchSize = document.getElementById('patchSize').value;
+            const frequency = parseInt(document.getElementById('frequency').value);
+
+            let config = {
+                inputStream: {
+                    name: "Live",
+                    type: "LiveStream",
+                    target: camera,
+                    constraints: {
+                        width: { min: 640, ideal: 1280, max: 1920 },
+                        height: { min: 480, ideal: 720, max: 1080 },
+                        aspectRatio: { ideal: 1.7777777778 }, // 16:9
+                        frameRate: { ideal: 30 }
+                    },
+                    area: { // Define a área de scan (90% central)
+                        top: "5%",
+                        right: "5%",
+                        left: "5%",
+                        bottom: "5%"
+                    }
+                },
+                decoder: {
+                    readers: ["code_128_reader"]
+                },
+                locator: {
+                    patchSize: patchSize,
+                    halfSample: true
+                },
+                frequency: frequency
+            };
+
+            // Ajustes para alta resolução
+            if (resolution === 'high') {
+                config.inputStream.constraints.width = { min: 1280, ideal: 1920 };
+                config.inputStream.constraints.height = { min: 720, ideal: 1080 };
+                config.locator.halfSample = false; // Desativa meia-amostra para mais detalhes
+            }
+
+            return config;
+        }
+
+        async function initCamera() {
+            try {
+                status.textContent = "🔄 Solicitando acesso à câmera...";
+                
+                // Para códigos densos, preferir câmera traseira (melhor qualidade)
+                const constraints = {
+                    video: {
+                        width: { min: 1280, ideal: 1920 },
+                        height: { min: 720, ideal: 1080 },
+                        facingMode: { ideal: "environment" }
+                    }
+                };
+
+                stream = await navigator.mediaDevices.getUserMedia(constraints);
+                camera.srcObject = stream;
+
+                status.textContent = "✅ Câmera ativa - Inicializando leitor...";
+
+                // Inicializar Quagga após a câmera estar estável
+                setTimeout(initQuagga, 500);
+
+            } catch (err) {
+                console.error("Erro na câmera:", err);
+                status.textContent = "❌ Erro ao acessar câmera: " + err.message;
+                status.className = "status error";
+            }
+        }
+
+        function initQuagga() {
+            if (isInitialized) {
+                Quagga.stop();
+                Quagga.start();
                 return;
             }
-            console.log("Quagga inicializado com sucesso");
-        });
 
-        // Configurar callbacks do Quagga
-        Quagga.onDetected(function(result) {
-            if (isScanning) return;
-            
-            isScanning = true;
-            scanOverlay.classList.remove('ready');
-            scanOverlay.classList.add('scanning');
-            status.textContent = "Código detectado!";
-            status.className = "status scanning";
-            
-            const code = result.codeResult.code;
-            resultText.textContent = code;
-            console.log("Código detectado:", code);
-            
-            // Feedback de áudio (opcional)
-            beep();
-            
-            // Reset após 2 segundos
-            setTimeout(() => {
-                isScanning = false;
-                scanOverlay.classList.remove('scanning');
-                scanOverlay.classList.add('ready');
-                status.textContent = "Pronto para escanear";
-                status.className = "status ready";
-            }, 2000);
-        });
+            const config = getQuaggaConfig();
 
-        Quagga.onProcessed(function(result) {
-            if (!result) return;
-            
-            // Atualizar overlay baseado na detecção
-            if (result.codeResult && result.codeResult.code) {
-                scanOverlay.style.borderColor = "#ff0000";
-            } else {
-                scanOverlay.style.borderColor = "#00ff00";
-            }
-        });
+            Quagga.init(config, function(err) {
+                if (err) {
+                    console.error("Erro Quagga:", err);
+                    status.textContent = "❌ Erro no leitor: " + err.message;
+                    status.className = "status error";
+                    return;
+                }
 
-        // Controles de câmera
-        async function startCamera() {
-            try {
-                stream = await navigator.mediaDevices.getUserMedia({
-                    video: {
-                        facingMode: "environment",
-                        width: { ideal: 1280 },
-                        height: { ideal: 720 }
-                    }
-                });
-                
-                camera.srcObject = stream;
-                startBtn.disabled = true;
-                stopBtn.disabled = false;
-                
+                console.log("Quagga inicializado com configuração:", config);
                 Quagga.start();
+                isInitialized = true;
+                status.textContent = "🔍 Scanner ativo - Aponte para o código";
+                status.className = "status ready";
+
+                updateDebugInfo("Leitor iniciado com configurações otimizadas para códigos densos");
+            });
+
+            Quagga.onDetected(function(result) {
+                const code = result.codeResult.code;
+                result.innerHTML = `<strong style="color: #4CAF50; font-size: 18px;">✅ Código lido: ${code}</strong>`;
                 
-                status.textContent = "Camera ativa - Posicione o código";
-                
-            } catch (err) {
-                console.error("Erro ao acessar câmera:", err);
-                resultText.textContent = "Erro ao acessar câmera: " + err.message;
-            }
+                updateDebugInfo(`
+                    Code: ${code}<br>
+                    Formato: ${result.codeResult.format}<br>
+                    Confiança: ${(result.codeResult.decodedCodes[0].confidence * 100).toFixed(1)}%<br>
+                    Zoom atual: ${currentZoom.toFixed(1)}x
+                `);
+
+                // Feedback visual
+                document.getElementById('scan-area').style.borderColor = '#ff0000';
+                setTimeout(() => {
+                    document.getElementById('scan-area').style.borderColor = '#4CAF50';
+                }, 500);
+            });
+
+            Quagga.onProcessed(function(result) {
+                if (result && result.codeResult && result.codeResult.code) {
+                    document.getElementById('scan-area').style.borderColor = '#ff9800';
+                }
+            });
+        }
+
+        function adjustZoom(delta) {
+            currentZoom = Math.max(0.5, Math.min(3.0, currentZoom + delta));
+            zoomLevel.textContent = currentZoom.toFixed(1) + 'x';
+            
+            // Aplicar zoom digital
+            camera.style.transform = `scale(${currentZoom})`;
+            camera.style.transformOrigin = 'center center';
+            
+            updateDebugInfo(`Zoom ajustado para: ${currentZoom.toFixed(1)}x - Ideal para códigos densos: 1.5x a 2.0x`);
         }
 
         function stopCamera() {
@@ -308,80 +378,43 @@
                 stream = null;
             }
             
-            Quagga.stop();
-            camera.srcObject = null;
-            
-            startBtn.disabled = false;
-            stopBtn.disabled = true;
-            
-            status.textContent = "Camera desativada";
-            resultText.textContent = "Nenhum código lido ainda";
-        }
-
-        // Controles de zoom
-        function changeZoom(delta) {
-            currentZoom = Math.max(0.5, Math.min(3.0, currentZoom + delta));
-            zoomLevel.textContent = currentZoom.toFixed(1) + "x";
-            
-            // Aplicar zoom digital (simulação)
-            camera.style.transform = `scale(${currentZoom})`;
-            
-            // Em dispositivos com zoom óptico, você pode usar:
-            // applyOpticalZoom(currentZoom);
-        }
-
-        // Função para aplicar zoom óptico (se suportado)
-        async function applyOpticalZoom(zoomLevel) {
-            if (!stream) return;
-            
-            const track = stream.getVideoTracks()[0];
-            const capabilities = track.getCapabilities();
-            
-            if (capabilities.zoom) {
-                try {
-                    await track.applyConstraints({
-                        advanced: [{ zoom: zoomLevel }]
-                    });
-                } catch (err) {
-                    console.warn("Zoom óptico não suportado:", err);
-                }
-            }
-        }
-
-        // Feedback sonoro
-        function beep() {
-            try {
-                const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-                const oscillator = audioCtx.createOscillator();
-                const gainNode = audioCtx.createGain();
-                
-                oscillator.connect(gainNode);
-                gainNode.connect(audioCtx.destination);
-                
-                oscillator.frequency.value = 800;
-                oscillator.type = 'sine';
-                
-                gainNode.gain.setValueAtTime(0.3, audioCtx.currentTime);
-                gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.5);
-                
-                oscillator.start(audioCtx.currentTime);
-                oscillator.stop(audioCtx.currentTime + 0.5);
-            } catch (err) {
-                console.warn("Áudio não suportado");
-            }
-        }
-
-        // Gerenciar visibilidade da página
-        document.addEventListener('visibilitychange', function() {
-            if (document.hidden) {
+            if (isInitialized) {
                 Quagga.stop();
-            } else if (stream) {
-                Quagga.start();
+                isInitialized = false;
+            }
+            
+            camera.srcObject = null;
+            status.textContent = "⏹ Câmera parada";
+            result.textContent = "Aguardando leitura...";
+            debugInfo.textContent = "";
+            
+            // Reset zoom
+            currentZoom = 1.0;
+            zoomLevel.textContent = '1.0x';
+            camera.style.transform = 'scale(1)';
+        }
+
+        function updateDebugInfo(info) {
+            debugInfo.innerHTML = `<strong>Debug:</strong> ${info}`;
+        }
+
+        // Atualizar configurações em tempo real
+        document.getElementById('resolution').addEventListener('change', function() {
+            if (isInitialized) {
+                status.textContent = "🔄 Reiniciando com novas configurações...";
+                setTimeout(initQuagga, 500);
             }
         });
 
-        // Limpar ao sair
-        window.addEventListener('beforeunload', stopCamera);
+        document.getElementById('patchSize').addEventListener('change', function() {
+            if (isInitialized) {
+                initQuagga();
+            }
+        });
+
+        // Dica inicial
+        updateDebugInfo("Para códigos densos como o 5786, use Zoom 1.5x-2.0x e configure 'Resolução Alta' + 'Tamanho X-Large'");
+
     </script>
 </body>
 </html>
