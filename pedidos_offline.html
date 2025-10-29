@@ -15,7 +15,7 @@
             min-height: 100vh;
             display: flex;
             flex-direction: column;
-            justify-content: center;
+            justify-content: flex-start;
             align-items: center;
             padding: 16px;
         }
@@ -192,6 +192,7 @@
                 <button onclick="toggleView('management')" class="text-indigo-500 hover:text-indigo-700 font-semibold underline ml-1">Gerenciar Base</button>
             </p>
 
+            <!-- Campo de Busca NO TOPO -->
             <div class="mb-4">
                 <label for="codeInput" class="block text-sm font-medium text-gray-700 mb-2 text-center">
                     CÓDIGO DE BARRAS / BUSCA POR DESCRIÇÃO
@@ -205,34 +206,35 @@
                 </div>
             </div>
 
-            <!-- Resultados da Busca SQL Like -->
-            <div id="searchResults" class="mb-4 max-h-64 overflow-y-auto border border-gray-200 rounded-lg hidden">
-                <div class="p-3 border-b border-gray-100 bg-gray-50">
-                    <p class="text-sm font-semibold text-gray-700">Resultados da Busca:</p>
+            <!-- Resultados da Busca SQL Like - MAIOR E MAIS VISÍVEL -->
+            <div id="searchResults" class="mb-4 max-h-80 overflow-y-auto border border-gray-200 rounded-lg hidden">
+                <div class="p-3 border-b border-gray-100 bg-indigo-50">
+                    <p class="text-sm font-semibold text-indigo-700">Resultados da Busca: <span id="resultsCount" class="text-indigo-600">0</span> produtos encontrados</p>
                 </div>
                 <div id="resultsList" class="divide-y divide-gray-100">
                     <!-- Resultados aparecem aqui -->
                 </div>
             </div>
 
-            <div id="productDisplay" class="border border-dashed border-gray-300 p-4 rounded-lg bg-gray-50 transition-all duration-300 min-h-[150px] flex flex-col justify-center items-center text-center">
+            <!-- Área do Produto Selecionado - REDUZIDA -->
+            <div id="productDisplay" class="border border-dashed border-gray-300 p-4 rounded-lg bg-gray-50 transition-all duration-300 min-h-[120px] flex flex-col justify-center items-center text-center">
                 <p id="messageText" class="text-gray-500 italic">Digite o código ou descrição do item para começar.</p>
                 
                 <div id="productDetails" class="hidden w-full space-y-2">
-                    <p class="text-xl font-bold text-gray-800" id="displayDescricao"></p>
+                    <p class="text-lg font-bold text-gray-800" id="displayDescricao"></p>
                     <p class="text-sm text-gray-600">Cód.: <span id="displayCodigo" class="font-semibold"></span></p>
-                    <p class="text-3xl font-extrabold text-emerald-600" id="displayVLUnit"></p>
+                    <p class="text-2xl font-extrabold text-emerald-600" id="displayVLUnit"></p>
                     <p class="text-sm text-gray-500">Unidade: <span id="displayUnidade" class="font-semibold text-gray-700">UN</span></p>
 
-                    <div class="pt-4">
+                    <div class="pt-3">
                         <label for="quantityInput" class="block text-sm font-medium text-gray-700 mb-1">QUANTIDADE</label>
                         <input type="number" id="quantityInput" value="1" min="1" 
-                            class="w-24 p-2 border border-gray-300 rounded-lg text-center font-semibold text-lg mx-auto block focus:ring-indigo-500 focus:border-indigo-500">
+                            class="w-20 p-2 border border-gray-300 rounded-lg text-center font-semibold text-base mx-auto block focus:ring-indigo-500 focus:border-indigo-500">
                     </div>
                 </div>
             </div>
 
-            <div class="mt-6 flex flex-col gap-3">
+            <div class="mt-4 flex flex-col gap-3">
                 <button onclick="addProductToQuote()" id="selectButton" disabled
                     class="btn-primary w-full text-white font-semibold py-3 rounded-lg shadow-xl text-lg disabled:opacity-50 disabled:cursor-not-allowed transition duration-200 flex items-center justify-center">
                     ➕ SELECIONAR ITEM
@@ -275,6 +277,7 @@
         const searchResults = document.getElementById('searchResults');
         const resultsList = document.getElementById('resultsList');
         const cameraVideo = document.getElementById('cameraVideo');
+        const resultsCount = document.getElementById('resultsCount');
 
         // --- FUNÇÕES GLOBAIS ---
 
@@ -410,11 +413,11 @@
                 }
             }
 
-            // Nada encontrado
+            // Nada encontrado - NÃO MOSTRA MENSAGEM, APENAS ESCONDE
             messageText.classList.remove('hidden');
             productDetailsDiv.classList.add('hidden');
             selectButton.disabled = true;
-            messageText.textContent = `Nenhum produto encontrado para "${cleanSearch}"`;
+            messageText.textContent = 'Digite o código ou descrição do item para começar.';
         };
 
         function displayProduct(product) {
@@ -423,11 +426,20 @@
             productDetailsDiv.classList.remove('hidden');
             selectButton.disabled = false;
             
-            let value = parseFloat(String(product.vlUnit).replace(',', '.')); 
+            // CORREÇÃO DO PREÇO: Converte corretamente string para número
+            let rawValue = product.vlUnit || '0.00';
+            // Remove possíveis R$ e espaços, depois converte vírgula para ponto
+            let cleanValue = String(rawValue).replace('R$', '').replace(/\s/g, '').replace(',', '.');
+            let value = parseFloat(cleanValue);
+            
+            // Se não for número válido, tenta outra abordagem
+            if (isNaN(value)) {
+                value = parseFloat(String(rawValue).replace(/[^\d,]/g, '').replace(',', '.'));
+            }
             
             document.getElementById('displayDescricao').textContent = product.descricao;
             document.getElementById('displayCodigo').textContent = product.codigo;
-            document.getElementById('displayVLUnit').textContent = isNaN(value) ? 'N/A' : `R$ ${value.toFixed(2)}`;
+            document.getElementById('displayVLUnit').textContent = isNaN(value) ? 'R$ 0,00' : `R$ ${value.toFixed(2).replace('.', ',')}`;
             document.getElementById('displayUnidade').textContent = product.unidade || 'UN';
             quantityInput.value = 1;
             
@@ -436,6 +448,7 @@
 
         function showSearchResults(results, searchFragments) {
             resultsList.innerHTML = '';
+            resultsCount.textContent = results.length;
             
             results.forEach(product => {
                 const resultElement = document.createElement('div');
@@ -446,13 +459,25 @@
                     window.showMessage(`✅ "${product.descricao}" selecionado!`, 'success');
                 };
                 
+                // CORREÇÃO DO PREÇO: Mesma lógica de conversão
+                let rawValue = product.vlUnit || '0.00';
+                let cleanValue = String(rawValue).replace('R$', '').replace(/\s/g, '').replace(',', '.');
+                let value = parseFloat(cleanValue);
+                if (isNaN(value)) {
+                    value = parseFloat(String(rawValue).replace(/[^\d,]/g, '').replace(',', '.'));
+                }
+                const formattedPrice = isNaN(value) ? 'R$ 0,00' : `R$ ${value.toFixed(2).replace('.', ',')}`;
+                
                 resultElement.innerHTML = `
                     <div class="flex justify-between items-start">
-                        <div>
-                            <p class="font-semibold text-gray-800">${highlightSearchFragments(product.descricao, searchFragments)}</p>
-                            <p class="text-xs text-gray-600">Cód: ${product.codigo} | R$ ${product.vlUnit}</p>
+                        <div class="flex-1">
+                            <p class="font-semibold text-gray-800 text-sm mb-1">${highlightSearchFragments(product.descricao, searchFragments)}</p>
+                            <p class="text-xs text-gray-600">Cód: ${product.codigo} | Unid: ${product.unidade || 'UN'}</p>
                         </div>
-                        <span class="bg-indigo-500 text-white px-2 py-1 rounded text-xs">Selecionar</span>
+                        <div class="text-right ml-2">
+                            <p class="font-bold text-emerald-700 text-sm">${formattedPrice}</p>
+                            <span class="bg-indigo-500 text-white px-2 py-1 rounded text-xs">Selecionar</span>
+                        </div>
                     </div>
                 `;
                 resultsList.appendChild(resultElement);
@@ -474,16 +499,7 @@
             searchResults.classList.add('hidden');
         };
 
-        window.selectProductFromSearch = function(code) {
-            const product = productDatabase.find(p => p.codigo === code);
-            if (product) {
-                codeInput.value = code;
-                displayProduct(product);
-                window.showMessage(`✅ "${product.descricao}" selecionado!`, 'success');
-            }
-        };
-
-        // --- FUNÇÕES EXISTENTES (mantidas como estavam) ---
+        // --- FUNÇÕES EXISTENTES (COM CORREÇÃO DO PREÇO) ---
         
         window.updateProductCountUI = function() {
             currentProductCountSpan.textContent = productDatabase.length;
@@ -517,7 +533,15 @@
             }
 
             selectedItems.forEach(item => {
-                const totalItem = parseFloat(item.vlUnit) * item.quantity;
+                // CORREÇÃO DO PREÇO: Mesma lógica de conversão
+                let rawValue = item.vlUnit || '0.00';
+                let cleanValue = String(rawValue).replace('R$', '').replace(/\s/g, '').replace(',', '.');
+                let value = parseFloat(cleanValue);
+                if (isNaN(value)) {
+                    value = parseFloat(String(rawValue).replace(/[^\d,]/g, '').replace(',', '.'));
+                }
+                
+                const totalItem = isNaN(value) ? 0 : value * item.quantity;
                 total += totalItem;
                 
                 const itemElement = document.createElement('div');
@@ -526,7 +550,7 @@
                     <div class="flex-grow min-w-0 pr-3">
                         <p class="text-base font-semibold text-gray-800">${item.descricao}</p>
                         <p class="text-xs text-gray-600">Cód: ${item.codigo} | Qtd: <span class="font-bold text-indigo-600">${item.quantity}</span></p>
-                        <p class="text-sm font-bold text-emerald-700">R$ ${totalItem.toFixed(2)}</p>
+                        <p class="text-sm font-bold text-emerald-700">R$ ${totalItem.toFixed(2).replace('.', ',')}</p>
                     </div>
                     <button onclick="removeItem('${item.id}')" 
                             class="text-red-600 hover:text-red-900 transition p-2 rounded-full hover:bg-red-100 flex-shrink-0"
@@ -537,7 +561,7 @@
                 selectedItemsList.appendChild(itemElement);
             });
 
-            quoteTotalSpan.textContent = `R$ ${total.toFixed(2)}`;
+            quoteTotalSpan.textContent = `R$ ${total.toFixed(2).replace('.', ',')}`;
             quoteItemCountSpan.textContent = selectedItems.length;
         };
 
@@ -573,8 +597,15 @@
             let totalCotacao = 0;
             
             selectedItems.forEach(item => {
-                const valorUnitario = parseFloat(item.vlUnit);
-                const totalItem = valorUnitario * item.quantity;
+                // CORREÇÃO DO PREÇO: Mesma lógica de conversão
+                let rawValue = item.vlUnit || '0.00';
+                let cleanValue = String(rawValue).replace('R$', '').replace(/\s/g, '').replace(',', '.');
+                let valorUnitario = parseFloat(cleanValue);
+                if (isNaN(valorUnitario)) {
+                    valorUnitario = parseFloat(String(rawValue).replace(/[^\d,]/g, '').replace(',', '.'));
+                }
+                
+                const totalItem = isNaN(valorUnitario) ? 0 : valorUnitario * item.quantity;
                 totalCotacao += totalItem;
                 
                 const row = [
@@ -582,7 +613,7 @@
                     item.codigo,
                     item.descricao.replace(/;/g, ','),
                     item.quantity,
-                    valorUnitario.toFixed(2).replace('.', ','),
+                    (isNaN(valorUnitario) ? '0.00' : valorUnitario.toFixed(2)).replace('.', ','),
                     totalItem.toFixed(2).replace('.', ',')
                 ];
                 csvRows.push(row.join(';'));
@@ -596,17 +627,33 @@
         window.generateWhatsAppMessage = function(clientName) {
             let totalCotacao = 0;
             selectedItems.forEach(item => {
-                totalCotacao += parseFloat(item.vlUnit) * item.quantity;
+                // CORREÇÃO DO PREÇO: Mesma lógica de conversão
+                let rawValue = item.vlUnit || '0.00';
+                let cleanValue = String(rawValue).replace('R$', '').replace(/\s/g, '').replace(',', '.');
+                let value = parseFloat(cleanValue);
+                if (isNaN(value)) {
+                    value = parseFloat(String(rawValue).replace(/[^\d,]/g, '').replace(',', '.'));
+                }
+                totalCotacao += isNaN(value) ? 0 : value * item.quantity;
             });
             
             return `*COTAÇÃO - ${clientName.toUpperCase()}*
 
 *Resumo da Cotação:*
 • Itens: ${selectedItems.length}
-• Total: R$ ${totalCotacao.toFixed(2)}
+• Total: R$ ${totalCotacao.toFixed(2).replace('.', ',')}
 
 *Itens incluídos:*
-${selectedItems.map(item => `• ${item.quantity}x ${item.descricao} - R$ ${(parseFloat(item.vlUnit) * item.quantity).toFixed(2)}`).join('\n')}
+${selectedItems.map(item => {
+    let rawValue = item.vlUnit || '0.00';
+    let cleanValue = String(rawValue).replace('R$', '').replace(/\s/g, '').replace(',', '.');
+    let value = parseFloat(cleanValue);
+    if (isNaN(value)) {
+        value = parseFloat(String(rawValue).replace(/[^\d,]/g, '').replace(',', '.'));
+    }
+    const totalItem = isNaN(value) ? 0 : value * item.quantity;
+    return `• ${item.quantity}x ${item.descricao} - R$ ${totalItem.toFixed(2).replace('.', ',')}`;
+}).join('\n')}
 
 _O arquivo CSV com detalhes completos foi gerado e pode ser anexado como documento._
 
@@ -690,21 +737,25 @@ _O arquivo CSV com detalhes completos foi gerado e pode ser anexado como documen
                 // Se não houver dados, carrega base de teste
                     if (productDatabase.length === 0) {
                         productDatabase = [
-                            { codigo: '789123', descricao: 'MONITOR LED 24 POLEGADAS FULL HD', vlUnit: '599.90', unidade: 'UN' },
-                            { codigo: '456789', descricao: 'MONITOR GAMER 27 POLEGADAS 144Hz', vlUnit: '899.90', unidade: 'UN' },
-                            { codigo: '123456', descricao: 'MOUSE GAMER RGB PROFISSIONAL', vlUnit: '89.90', unidade: 'UN' },
-                            { codigo: '789012', descricao: 'TECLADO MECANICO RGB AZUL', vlUnit: '199.90', unidade: 'UN' },
-                            { codigo: '345678', descricao: 'WEBCAM 1080P PROFESSIONAL STREAM', vlUnit: '159.90', unidade: 'UN' }
+                            { codigo: '789123', descricao: 'MONITOR LED 24 POLEGADAS FULL HD', vlUnit: '599,90', unidade: 'UN' },
+                            { codigo: '456789', descricao: 'MONITOR GAMER 27 POLEGADAS 144Hz', vlUnit: '899,90', unidade: 'UN' },
+                            { codigo: '123456', descricao: 'MOUSE GAMER RGB PROFISSIONAL', vlUnit: '89,90', unidade: 'UN' },
+                            { codigo: '789012', descricao: 'TECLADO MECANICO RGB AZUL', vlUnit: '199,90', unidade: 'UN' },
+                            { codigo: '345678', descricao: 'WEBCAM 1080P PROFESSIONAL STREAM', vlUnit: '159,90', unidade: 'UN' },
+                            { codigo: '555555', descricao: 'PRODUTO TESTE PRECOS', vlUnit: '55,15', unidade: 'UN' },
+                            { codigo: '666666', descricao: 'OUTRO PRODUTO TESTE', vlUnit: '123,45', unidade: 'UN' }
                         ];
                     }
                 } else {
                     // Carrega base de teste se não houver dados salvos
                     productDatabase = [
-                        { codigo: '789123', descricao: 'MONITOR LED 24 POLEGADAS FULL HD', vlUnit: '599.90', unidade: 'UN' },
-                        { codigo: '456789', descricao: 'MONITOR GAMER 27 POLEGADAS 144Hz', vlUnit: '899.90', unidade: 'UN' },
-                        { codigo: '123456', descricao: 'MOUSE GAMER RGB PROFISSIONAL', vlUnit: '89.90', unidade: 'UN' },
-                        { codigo: '789012', descricao: 'TECLADO MECANICO RGB AZUL', vlUnit: '199.90', unidade: 'UN' },
-                        { codigo: '345678', descricao: 'WEBCAM 1080P PROFESSIONAL STREAM', vlUnit: '159.90', unidade: 'UN' }
+                        { codigo: '789123', descricao: 'MONITOR LED 24 POLEGADAS FULL HD', vlUnit: '599,90', unidade: 'UN' },
+                        { codigo: '456789', descricao: 'MONITOR GAMER 27 POLEGADAS 144Hz', vlUnit: '899,90', unidade: 'UN' },
+                        { codigo: '123456', descricao: 'MOUSE GAMER RGB PROFISSIONAL', vlUnit: '89,90', unidade: 'UN' },
+                        { codigo: '789012', descricao: 'TECLADO MECANICO RGB AZUL', vlUnit: '199,90', unidade: 'UN' },
+                        { codigo: '345678', descricao: 'WEBCAM 1080P PROFESSIONAL STREAM', vlUnit: '159,90', unidade: 'UN' },
+                        { codigo: '555555', descricao: 'PRODUTO TESTE PRECOS', vlUnit: '55,15', unidade: 'UN' },
+                        { codigo: '666666', descricao: 'OUTRO PRODUTO TESTE', vlUnit: '123,45', unidade: 'UN' }
                     ];
                 }
             } catch (e) {
@@ -747,11 +798,12 @@ _O arquivo CSV com detalhes completos foi gerado e pode ser anexado como documen
             reader.onload = function(e) {
                 // Simulação de importação
                 const testData = [
-                    { codigo: '789123', descricao: 'MONITOR LED 24 POLEGADAS FULL HD', vlUnit: '599.90', unidade: 'UN' },
-                    { codigo: '456789', descricao: 'MONITOR GAMER 27 POLEGADAS 144Hz', vlUnit: '899.90', unidade: 'UN' },
-                    { codigo: '123456', descricao: 'MOUSE GAMER RGB PROFISSIONAL', vlUnit: '89.90', unidade: 'UN' },
-                    { codigo: '789012', descricao: 'TECLADO MECANICO RGB AZUL', vlUnit: '199.90', unidade: 'UN' },
-                    { codigo: '345678', descricao: 'WEBCAM 1080P PROFESSIONAL STREAM', vlUnit: '159.90', unidade: 'UN' }
+                    { codigo: '789123', descricao: 'MONITOR LED 24 POLEGADAS FULL HD', vlUnit: '599,90', unidade: 'UN' },
+                    { codigo: '456789', descricao: 'MONITOR GAMER 27 POLEGADAS 144Hz', vlUnit: '899,90', unidade: 'UN' },
+                    { codigo: '123456', descricao: 'MOUSE GAMER RGB PROFISSIONAL', vlUnit: '89,90', unidade: 'UN' },
+                    { codigo: '789012', descricao: 'TECLADO MECANICO RGB AZUL', vlUnit: '199,90', unidade: 'UN' },
+                    { codigo: '345678', descricao: 'WEBCAM 1080P PROFESSIONAL STREAM', vlUnit: '159,90', unidade: 'UN' },
+                    { codigo: '555555', descricao: 'PRODUTO TESTE PRECOS', vlUnit: '55,15', unidade: 'UN' }
                 ];
                 
                 productDatabase = testData;
