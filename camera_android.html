@@ -59,8 +59,26 @@
             border: 3px solid #00ff00;
             background: rgba(0, 255, 0, 0.1);
             border-radius: 10px;
-            z-index: 10;
-            box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.5);
+            transition: all 0.3s ease;
+            z-index: 10; /* ADICIONADO: Garantir que fique acima do vídeo */
+            box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.5); /* ADICIONADO: Escurecer ao redor */
+        }
+
+        #scan-overlay.scanning {
+            border-color: #ff0000;
+            background: rgba(255, 0, 0, 0.1);
+            animation: pulse 1.5s infinite;
+        }
+
+        #scan-overlay.ready {
+            border-color: #00ff00;
+            background: rgba(0, 255, 0, 0.1);
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
         }
 
         .instructions {
@@ -85,32 +103,87 @@
             color: white;
             font-size: 16px;
             cursor: pointer;
+            transition: background 0.3s;
         }
 
-        #camera-select {
-            width: 100%;
-            padding: 10px;
-            margin: 10px 0;
-            border-radius: 5px;
-            border: 1px solid #ddd;
+        button:hover {
+            background: #0056b3;
         }
 
-        .error {
-            color: #dc3545;
-            background: rgba(220, 53, 69, 0.1);
-            padding: 10px;
-            border-radius: 5px;
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        #result {
+            margin-top: 15px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border-left: 4px solid #007bff;
+        }
+
+        .zoom-controls {
+            display: flex; /* CORRIGIDO: Agora deve aparecer */
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
             margin: 10px 0;
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 8px;
+        }
+
+        .zoom-btn {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: #007bff;
+            color: white;
+            border: none;
+            font-size: 18px;
+            cursor: pointer;
+            display: flex; /* CORRIGIDO */
+            align-items: center;
+            justify-content: center;
+        }
+
+        .zoom-level {
+            font-weight: bold;
+            color: #333;
+            min-width: 50px;
             text-align: center;
         }
 
-        .success {
+        .status {
+            text-align: center;
+            margin: 10px 0;
+            font-weight: bold;
+            padding: 8px;
+            border-radius: 5px;
+        }
+
+        .status.ready {
             color: #28a745;
             background: rgba(40, 167, 69, 0.1);
-            padding: 10px;
-            border-radius: 5px;
-            margin: 10px 0;
-            text-align: center;
+        }
+
+        .status.scanning {
+            color: #dc3545;
+            background: rgba(220, 53, 69, 0.1);
+        }
+
+        /* ADICIONADO: Estilo para quando a câmera não está ativa */
+        #camera-container:not(.active) {
+            background: #333;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+        }
+
+        #camera-container:not(.active)::before {
+            content: "🎥 Clique em 'Iniciar Câmera'";
         }
     </style>
 </head>
@@ -122,19 +195,22 @@
             Posicione o código de barras na área verde abaixo
         </div>
 
-        <div id="status" class="instructions">Pronto para iniciar</div>
+        <div class="status ready" id="status">Pronto para escanear</div>
 
-        <select id="camera-select" style="display: none;">
-            <option value="">Selecionar câmera...</option>
-        </select>
+        <!-- CORRIGIDO: Zoom controls agora visíveis -->
+        <div class="zoom-controls">
+            <button class="zoom-btn" onclick="changeZoom(-0.2)">-</button>
+            <span class="zoom-level" id="zoomLevel">1.0x</span>
+            <button class="zoom-btn" onclick="changeZoom(0.2)">+</button>
+        </div>
 
         <div id="camera-container">
             <video id="camera" autoplay playsinline></video>
-            <div id="scan-overlay"></div>
+            <div id="scan-overlay" class="ready"></div>
         </div>
 
         <div class="controls">
-            <button id="startBtn" onclick="initCamera()">🎥 Iniciar Câmera</button>
+            <button id="startBtn" onclick="startCamera()">🎥 Iniciar Câmera</button>
             <button id="stopBtn" onclick="stopCamera()" disabled>⏹ Parar</button>
         </div>
 
@@ -143,199 +219,125 @@
         </div>
 
         <div class="instructions">
-            Dica: Mantenha o código estável e bem iluminado
+            Dica: Mantenha o código estável e bem iluminado dentro da área verde
         </div>
     </div>
 
     <script>
         let stream = null;
-        let currentCamera = null;
+        let currentZoom = 1.0;
+        let isScanning = false;
 
+        // Elementos DOM
         const camera = document.getElementById('camera');
+        const scanOverlay = document.getElementById('scan-overlay');
         const startBtn = document.getElementById('startBtn');
         const stopBtn = document.getElementById('stopBtn');
-        const status = document.getElementById('status');
         const resultText = document.getElementById('resultText');
-        const cameraSelect = document.getElementById('camera-select');
-
-        // Listar câmeras disponíveis
-        async function getCameras() {
-            try {
-                const devices = await navigator.mediaDevices.enumerateDevices();
-                const videoDevices = devices.filter(device => device.kind === 'videoinput');
-                
-                cameraSelect.innerHTML = '<option value="">Selecionar câmera...</option>';
-                videoDevices.forEach(device => {
-                    const option = document.createElement('option');
-                    option.value = device.deviceId;
-                    option.text = device.label || `Câmera ${cameraSelect.length}`;
-                    cameraSelect.appendChild(option);
-                });
-                
-                if (videoDevices.length > 1) {
-                    cameraSelect.style.display = 'block';
-                }
-            } catch (err) {
-                console.error('Erro ao listar câmeras:', err);
-            }
-        }
-
-        // Inicializar câmera
-        async function initCamera() {
-            try {
-                status.innerHTML = '🔄 Solicitando permissão da câmera...';
-                
-                // Primeiro, pegar permissão com configuração básica
-                const tempStream = await navigator.mediaDevices.getUserMedia({ 
-                    video: { width: 640, height: 480 } 
-                });
-                
-                // Parar stream temporário
-                tempStream.getTracks().forEach(track => track.stop());
-                
-                // Agora listar câmeras disponíveis
-                await getCameras();
-                
-                if (cameraSelect.style.display === 'block') {
-                    status.innerHTML = '✅ Permissão concedida. Selecione a câmera acima.';
-                    startBtn.textContent = '🎥 Iniciar Câmera Selecionada';
-                    startBtn.onclick = startSelectedCamera;
-                } else {
-                    // Se só tem uma câmera, iniciar automaticamente
-                    startCamera();
-                }
-                
-            } catch (err) {
-                showError(`Erro de permissão: ${err.message}`);
-                console.error('Erro na inicialização:', err);
-            }
-        }
-
-        // Iniciar câmera selecionada
-        async function startSelectedCamera() {
-            const deviceId = cameraSelect.value;
-            if (!deviceId) {
-                showError('Por favor, selecione uma câmera');
-                return;
-            }
-            await startCamera(deviceId);
-        }
-
-        // Iniciar câmera específica
-        async function startCamera(deviceId = null) {
-            try {
-                status.innerHTML = '🔄 Iniciando câmera...';
-                
-                const constraints = {
-                    video: {
-                        width: { ideal: 1280 },
-                        height: { ideal: 720 },
-                        frameRate: { ideal: 30 }
-                    }
-                };
-
-                // Se deviceId foi especificado, usar câmera específica
-                if (deviceId) {
-                    constraints.video.deviceId = { exact: deviceId };
-                } else {
-                    // Tentar câmera traseira primeiro, depois qualquer câmera
-                    constraints.video.facingMode = { ideal: 'environment' };
-                }
-
-                stream = await navigator.mediaDevices.getUserMedia(constraints);
-                
-                camera.srcObject = stream;
-                startBtn.disabled = true;
-                stopBtn.disabled = false;
-                
-                status.innerHTML = '✅ Câmera ativa - Aponte para o código de barras';
-                showSuccess('Câmera iniciada com sucesso!');
-                
-                // Inicializar Quagga após a câmera estar estável
-                setTimeout(initQuagga, 1000);
-                
-            } catch (err) {
-                // Se falhar com câmera traseira, tentar qualquer câmera
-                if (!deviceId && err.name === 'OverconstrainedError') {
-                    console.log('Tentando câmera frontal...');
-                    await startCameraWithFallback();
-                } else {
-                    showError(`Erro ao iniciar câmera: ${err.message}`);
-                    console.error('Erro detalhado:', err);
-                }
-            }
-        }
-
-        // Fallback para câmera frontal
-        async function startCameraWithFallback() {
-            try {
-                status.innerHTML = '🔄 Tentando câmera frontal...';
-                
-                stream = await navigator.mediaDevices.getUserMedia({
-                    video: {
-                        width: { ideal: 1280 },
-                        height: { ideal: 720 },
-                        facingMode: 'user' // Câmera frontal
-                    }
-                });
-                
-                camera.srcObject = stream;
-                startBtn.disabled = true;
-                stopBtn.disabled = false;
-                status.innerHTML = '✅ Câmera frontal ativa';
-                showSuccess('Câmera frontal iniciada!');
-                
-                setTimeout(initQuagga, 1000);
-                
-            } catch (err) {
-                showError(`Erro com câmera frontal também: ${err.message}`);
-            }
-        }
+        const status = document.getElementById('status');
+        const zoomLevel = document.getElementById('zoomLevel');
+        const cameraContainer = document.getElementById('camera-container');
 
         // Inicializar Quagga
         function initQuagga() {
+            Quagga.init({
+                inputStream: {
+                    name: "Live",
+                    type: "LiveStream",
+                    target: camera,
+                    constraints: {
+                        width: 640,
+                        height: 480,
+                        facingMode: "environment" // Usar câmera traseira
+                    }
+                },
+                decoder: {
+                    readers: ["code_128_reader"]
+                },
+                locator: {
+                    patchSize: "medium",
+                    halfSample: true
+                },
+                locate: true,
+                frequency: 10
+            }, function(err) {
+                if (err) {
+                    console.error("Erro ao inicializar Quagga:", err);
+                    resultText.textContent = "Erro ao inicializar leitor: " + err.message;
+                    return;
+                }
+                console.log("Quagga inicializado com sucesso");
+            });
+
+            // Configurar callbacks do Quagga
+            Quagga.onDetected(function(result) {
+                if (isScanning) return;
+                
+                isScanning = true;
+                scanOverlay.classList.remove('ready');
+                scanOverlay.classList.add('scanning');
+                status.textContent = "Código detectado!";
+                status.className = "status scanning";
+                
+                const code = result.codeResult.code;
+                resultText.textContent = code;
+                console.log("Código detectado:", code);
+                
+                // Feedback de áudio (opcional)
+                beep();
+                
+                // Reset após 2 segundos
+                setTimeout(() => {
+                    isScanning = false;
+                    scanOverlay.classList.remove('scanning');
+                    scanOverlay.classList.add('ready');
+                    status.textContent = "Pronto para escanear";
+                    status.className = "status ready";
+                }, 2000);
+            });
+
+            Quagga.onProcessed(function(result) {
+                if (!result) return;
+                
+                // Atualizar overlay baseado na detecção
+                if (result.codeResult && result.codeResult.code) {
+                    scanOverlay.style.borderColor = "#ff0000";
+                } else {
+                    scanOverlay.style.borderColor = "#00ff00";
+                }
+            });
+        }
+
+        // Controles de câmera
+        async function startCamera() {
             try {
-                Quagga.init({
-                    inputStream: {
-                        name: "Live",
-                        type: "LiveStream",
-                        target: camera,
-                        constraints: {
-                            width: 640,
-                            height: 480
-                        }
-                    },
-                    decoder: {
-                        readers: ["code_128_reader"]
+                stream = await navigator.mediaDevices.getUserMedia({
+                    video: {
+                        facingMode: "environment",
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 }
                     }
-                }, function(err) {
-                    if (err) {
-                        console.error("Erro Quagga:", err);
-                        showError("Leitor não pôde iniciar, mas a câmera está ativa");
-                        return;
-                    }
-                    console.log("Quagga iniciado");
+                });
+                
+                camera.srcObject = stream;
+                startBtn.disabled = true;
+                stopBtn.disabled = false;
+                cameraContainer.classList.add('active');
+                
+                // Inicializar Quagga após a câmera estar pronta
+                setTimeout(() => {
+                    initQuagga();
                     Quagga.start();
-                });
-
-                Quagga.onDetected(function(result) {
-                    const code = result.codeResult.code;
-                    resultText.textContent = code;
-                    showSuccess(`Código lido: ${code}`);
-                    
-                    // Feedback visual
-                    document.getElementById('scan-overlay').style.borderColor = '#ff0000';
-                    setTimeout(() => {
-                        document.getElementById('scan-overlay').style.borderColor = '#00ff00';
-                    }, 1000);
-                });
-
+                }, 500);
+                
+                status.textContent = "Camera ativa - Posicione o código";
+                
             } catch (err) {
-                console.error("Erro na inicialização do Quagga:", err);
+                console.error("Erro ao acessar câmera:", err);
+                resultText.textContent = "Erro ao acessar câmera: " + err.message;
             }
         }
 
-        // Parar câmera
         function stopCamera() {
             if (stream) {
                 stream.getTracks().forEach(track => track.stop());
@@ -344,34 +346,60 @@
             
             Quagga.stop();
             camera.srcObject = null;
+            cameraContainer.classList.remove('active');
             
             startBtn.disabled = false;
             stopBtn.disabled = true;
-            startBtn.textContent = '🎥 Iniciar Câmera';
-            startBtn.onclick = initCamera;
             
-            status.innerHTML = '⏹ Câmera parada';
-            cameraSelect.style.display = 'none';
+            status.textContent = "Camera desativada";
+            resultText.textContent = "Nenhum código lido ainda";
         }
 
-        // Funções de utilidade
-        function showError(message) {
-            status.innerHTML = `❌ ${message}`;
-            status.className = 'error';
+        // Controles de zoom
+        function changeZoom(delta) {
+            currentZoom = Math.max(0.5, Math.min(3.0, currentZoom + delta));
+            zoomLevel.textContent = currentZoom.toFixed(1) + "x";
+            
+            // Aplicar zoom digital
+            camera.style.transform = `scale(${currentZoom})`;
+            camera.style.transformOrigin = 'center center';
+            
+            console.log("Zoom ajustado para:", currentZoom + "x");
         }
 
-        function showSuccess(message) {
-            status.innerHTML = `✅ ${message}`;
-            status.className = 'success';
-        }
-
-        // Gerenciar permissões
-        document.addEventListener('DOMContentLoaded', function() {
-            // Verificar se a API de mídia é suportada
-            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-                showError('Seu navegador não suporta acesso à câmera');
-                startBtn.disabled = true;
+        // Feedback sonoro
+        function beep() {
+            try {
+                // Método simples usando HTML Audio
+                const audio = new Audio("data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQQAAAAAAA==");
+                audio.play().catch(e => console.log("Áudio não pode ser reproduzido"));
+            } catch (err) {
+                console.warn("Áudio não suportado");
             }
+        }
+
+        // Gerenciar visibilidade da página
+        document.addEventListener('visibilitychange', function() {
+            if (document.hidden) {
+                Quagga.stop();
+            } else if (stream) {
+                setTimeout(() => Quagga.start(), 300);
+            }
+        });
+
+        // Limpar ao sair
+        window.addEventListener('beforeunload', stopCamera);
+
+        // CORRIGIDO: Inicializar elementos visuais
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log("DOM carregado - elementos devem estar visíveis");
+            // Forçar redesenho do overlay
+            setTimeout(() => {
+                scanOverlay.style.display = 'none';
+                setTimeout(() => {
+                    scanOverlay.style.display = 'block';
+                }, 100);
+            }, 500);
         });
     </script>
 </body>
