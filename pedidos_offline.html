@@ -97,6 +97,16 @@
             z-index: 10;
             border-radius: 8px;
         }
+        .compact-header {
+            transition: all 0.3s ease;
+        }
+        .compact-header.hidden {
+            opacity: 0;
+            height: 0;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+        }
     </style>
 </head>
 <body>
@@ -186,13 +196,16 @@
     <!-- Tela Principal -->
     <div id="mainQuotationView" class="view-container">
         <div class="card">
-            <h1 class="text-xl sm:text-2xl font-bold text-gray-800 mb-4 text-center">Nova Cotação</h1>
-            <p class="text-sm text-gray-500 mb-6 text-center">
-                <span id="mainProductCount" class="font-bold text-indigo-600">0</span> produtos carregados.
-                <button onclick="toggleView('management')" class="text-indigo-500 hover:text-indigo-700 font-semibold underline ml-1">Gerenciar Base</button>
-            </p>
+            <!-- Cabeçalho compacto que some durante a busca -->
+            <div id="compactHeader" class="compact-header text-center mb-4">
+                <h1 class="text-xl sm:text-2xl font-bold text-gray-800">Nova Cotação</h1>
+                <p class="text-sm text-gray-500 mt-2">
+                    <span id="mainProductCount" class="font-bold text-indigo-600">0</span> produtos carregados.
+                    <button onclick="toggleView('management')" class="text-indigo-500 hover:text-indigo-700 font-semibold underline ml-1">Gerenciar Base</button>
+                </p>
+            </div>
 
-            <!-- Campo de Busca NO TOPO -->
+            <!-- Campo de Busca NO TOPO DA TELA -->
             <div class="mb-4">
                 <label for="codeInput" class="block text-sm font-medium text-gray-700 mb-2 text-center">
                     CÓDIGO DE BARRAS / BUSCA POR DESCRIÇÃO
@@ -207,7 +220,7 @@
             </div>
 
             <!-- Resultados da Busca SQL Like - MAIOR E MAIS VISÍVEL -->
-            <div id="searchResults" class="mb-4 max-h-80 overflow-y-auto border border-gray-200 rounded-lg hidden">
+            <div id="searchResults" class="mb-4 max-h-96 overflow-y-auto border border-gray-200 rounded-lg hidden">
                 <div class="p-3 border-b border-gray-100 bg-indigo-50">
                     <p class="text-sm font-semibold text-indigo-700">Resultados da Busca: <span id="resultsCount" class="text-indigo-600">0</span> produtos encontrados</p>
                 </div>
@@ -216,11 +229,9 @@
                 </div>
             </div>
 
-            <!-- Área do Produto Selecionado - REDUZIDA -->
-            <div id="productDisplay" class="border border-dashed border-gray-300 p-4 rounded-lg bg-gray-50 transition-all duration-300 min-h-[120px] flex flex-col justify-center items-center text-center">
-                <p id="messageText" class="text-gray-500 italic">Digite o código ou descrição do item para começar.</p>
-                
-                <div id="productDetails" class="hidden w-full space-y-2">
+            <!-- Área do Produto Selecionado - SOMENTE QUANDO HÁ PRODUTO SELECIONADO -->
+            <div id="productDisplay" class="border border-dashed border-gray-300 p-4 rounded-lg bg-gray-50 transition-all duration-300 min-h-[120px] flex flex-col justify-center items-center text-center hidden">
+                <div id="productDetails" class="w-full space-y-2">
                     <p class="text-lg font-bold text-gray-800" id="displayDescricao"></p>
                     <p class="text-sm text-gray-600">Cód.: <span id="displayCodigo" class="font-semibold"></span></p>
                     <p class="text-2xl font-extrabold text-emerald-600" id="displayVLUnit"></p>
@@ -237,13 +248,21 @@
             <div class="mt-4 flex flex-col gap-3">
                 <button onclick="addProductToQuote()" id="selectButton" disabled
                     class="btn-primary w-full text-white font-semibold py-3 rounded-lg shadow-xl text-lg disabled:opacity-50 disabled:cursor-not-allowed transition duration-200 flex items-center justify-center">
-                    ➕ SELECIONAR ITEM
+                    ➕ ADICIONAR À COTAÇÃO
                 </button>
                 
                 <button onclick="toggleView('options')"
                     class="w-full bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold py-3 rounded-lg transition duration-200 shadow-md flex items-center justify-center">
-                    ⚙️ OPÇÕES (<span id="quoteItemCount">0</span> itens na lista)
+                    ⚙️ OPÇÕES (<span id="quoteItemCount">0</span> itens)
                 </button>
+            </div>
+
+            <!-- Rodapé com informações -->
+            <div class="mt-6 pt-4 border-t border-gray-200 text-center">
+                <p class="text-xs text-gray-500">
+                    <span id="footerProductCount" class="font-bold text-indigo-600">0</span> produtos na base • 
+                    <button onclick="toggleView('management')" class="text-indigo-500 hover:text-indigo-700 font-semibold underline">Gerenciar</button>
+                </p>
             </div>
         </div>
 
@@ -265,8 +284,8 @@
         const codeInput = document.getElementById('codeInput');
         const quantityInput = document.getElementById('quantityInput');
         const selectButton = document.getElementById('selectButton');
+        const productDisplay = document.getElementById('productDisplay');
         const productDetailsDiv = document.getElementById('productDetails');
-        const messageText = document.getElementById('messageText');
         const selectedItemsList = document.getElementById('selectedItemsList');
         const quoteTotalSpan = document.getElementById('quoteTotal');
         const quoteItemCountSpan = document.getElementById('quoteItemCount');
@@ -274,10 +293,12 @@
         const fileInput = document.getElementById('fileInput');
         const currentProductCountSpan = document.getElementById('currentProductCount');
         const mainProductCountSpan = document.getElementById('mainProductCount');
+        const footerProductCount = document.getElementById('footerProductCount');
         const searchResults = document.getElementById('searchResults');
         const resultsList = document.getElementById('resultsList');
         const cameraVideo = document.getElementById('cameraVideo');
         const resultsCount = document.getElementById('resultsCount');
+        const compactHeader = document.getElementById('compactHeader');
 
         // --- FUNÇÕES GLOBAIS ---
 
@@ -364,14 +385,19 @@
             const cleanSearch = String(searchTerm).trim();
             foundProduct = null;
             
-            // Esconde resultados anteriores
+            // Esconde resultados anteriores e produto selecionado
             window.hideSearchResults();
+            productDisplay.classList.add('hidden');
+            selectButton.disabled = true;
+            
+            // Controla visibilidade do cabeçalho
+            if (cleanSearch.length > 0) {
+                compactHeader.classList.add('hidden');
+            } else {
+                compactHeader.classList.remove('hidden');
+            }
             
             if (!cleanSearch) {
-                messageText.classList.remove('hidden');
-                productDetailsDiv.classList.add('hidden');
-                selectButton.disabled = true;
-                messageText.textContent = 'Digite o código ou descrição do item para começar.';
                 return;
             }
 
@@ -413,17 +439,12 @@
                 }
             }
 
-            // Nada encontrado - NÃO MOSTRA MENSAGEM, APENAS ESCONDE
-            messageText.classList.remove('hidden');
-            productDetailsDiv.classList.add('hidden');
-            selectButton.disabled = true;
-            messageText.textContent = 'Digite o código ou descrição do item para começar.';
+            // Nada encontrado - mantém tudo oculto
         };
 
         function displayProduct(product) {
             foundProduct = product;
-            messageText.classList.add('hidden');
-            productDetailsDiv.classList.remove('hidden');
+            productDisplay.classList.remove('hidden');
             selectButton.disabled = false;
             
             // CORREÇÃO DO PREÇO: Converte corretamente string para número
@@ -502,8 +523,10 @@
         // --- FUNÇÕES EXISTENTES (COM CORREÇÃO DO PREÇO) ---
         
         window.updateProductCountUI = function() {
-            currentProductCountSpan.textContent = productDatabase.length;
-            mainProductCountSpan.textContent = productDatabase.length;
+            const count = productDatabase.length;
+            currentProductCountSpan.textContent = count;
+            mainProductCountSpan.textContent = count;
+            footerProductCount.textContent = count;
         };
 
         window.removeItem = function(itemId) {
@@ -725,6 +748,8 @@ _O arquivo CSV com detalhes completos foi gerado e pode ser anexado como documen
             window.saveQuote();
             window.showMessage(`✅ Adicionado: ${quantity}x ${foundProduct.descricao}`, 'success');
             
+            // Limpa a busca após adicionar
+            codeInput.value = '';
             window.findProduct('');
             codeInput.focus();
         };
@@ -734,7 +759,7 @@ _O arquivo CSV com detalhes completos foi gerado e pode ser anexado como documen
                 const storedData = localStorage.getItem('cotacao_product_database');
                 if (storedData) {
                     productDatabase = JSON.parse(storedData);
-                // Se não houver dados, carrega base de teste
+                    // Se não houver dados, carrega base de teste
                     if (productDatabase.length === 0) {
                         productDatabase = [
                             { codigo: '789123', descricao: 'MONITOR LED 24 POLEGADAS FULL HD', vlUnit: '599,90', unidade: 'UN' },
