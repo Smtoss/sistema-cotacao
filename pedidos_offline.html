@@ -64,19 +64,6 @@
 </head>
 <body>
     
-    <!-- Modal de Confirmação -->
-    <div id="customModal" class="overlay hidden">
-        <div class="overlay-content max-w-sm">
-            <h3 id="modalTitle" class="text-xl font-bold text-gray-800 mb-4">Atenção</h3>
-            <p id="modalMessage" class="text-gray-600 mb-6"></p>
-            <input type="text" id="modalInput" placeholder="Digite aqui" class="w-full p-3 border border-gray-300 rounded-lg mb-4 hidden">
-            <div class="flex justify-end space-x-3">
-                <button id="modalCancelButton" class="px-4 py-2 text-gray-600 bg-gray-200 rounded-lg hover:bg-gray-300 transition">Cancelar</button>
-                <button id="modalConfirmButton" class="px-4 py-2 text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition">Confirmar</button>
-            </div>
-        </div>
-    </div>
-
     <!-- Overlay de Gerenciamento -->
     <div id="managementOverlay" class="overlay">
         <div class="overlay-content">
@@ -208,8 +195,10 @@
         const currentProductCountSpan = document.getElementById('currentProductCount');
         const mainProductCountSpan = document.getElementById('mainProductCount');
 
-        // --- FUNÇÕES DE UTILIDADE ---
-        function showMessage(message, type) {
+        // --- FUNÇÕES GLOBAIS (ACESSÍVEIS DE QUALQUER LUGAR) ---
+
+        // Funções de UI
+        window.showMessage = function(message, type) {
             messageBox.textContent = message;
             messageBox.className = 'fixed bottom-4 right-4 p-3 rounded-lg shadow-xl text-sm z-50 transition-all duration-300 block';
             
@@ -224,50 +213,56 @@
             setTimeout(() => {
                 messageBox.classList.add('hidden');
             }, 3000);
-        }
+        };
 
-        function toggleView(viewName) {
+        window.toggleView = function(viewName) {
             mainView.style.display = 'none';
             optionsView.style.display = 'none';
             managementView.style.display = 'none';
             
             if (viewName === 'main') {
                 mainView.style.display = 'flex';
-                findProduct('');
+                window.findProduct('');
             } else if (viewName === 'options') {
-                renderQuoteList();
+                window.renderQuoteList();
                 optionsView.style.display = 'block';
             } else if (viewName === 'management') {
-                updateProductCountUI();
+                window.updateProductCountUI();
                 managementView.style.display = 'block';
             }
-        }
+        };
         
-        function updateProductCountUI() {
+        window.updateProductCountUI = function() {
             currentProductCountSpan.textContent = productDatabase.length;
             mainProductCountSpan.textContent = productDatabase.length;
-        }
+        };
 
         // --- FUNÇÕES VALIDADAS (LIXEIRA) ---
-        function removeItem(itemId) {
+        window.removeItem = function(itemId) {
+            console.log('🎯 CLICOU NA LIXEIRA - Item ID:', itemId);
+            
             const item = selectedItems.find(i => i.id === itemId);
             
-            if (!item) return;
+            if (!item) {
+                console.log('❌ Item não encontrado');
+                return;
+            }
             
             const userConfirmed = confirm(`Deseja realmente excluir "${item.descricao}" da lista?`);
             
             if (!userConfirmed) {
-                showMessage('❌ Exclusão cancelada.', 'error');
+                window.showMessage('❌ Exclusão cancelada.', 'error');
                 return;
             }
             
             selectedItems = selectedItems.filter(i => i.id !== itemId);
-            saveQuote();
-            renderQuoteList();
-            showMessage(`✅ "${item.descricao}" removido com sucesso!`, 'success');
-        }
+            window.saveQuote();
+            window.renderQuoteList();
+            window.showMessage(`✅ "${item.descricao}" removido com sucesso!`, 'success');
+        };
 
-        function renderQuoteList() {
+        window.renderQuoteList = function() {
+            console.log('🔄 Renderizando lista de itens...');
             selectedItemsList.innerHTML = '';
             let total = 0;
 
@@ -300,10 +295,12 @@
 
             quoteTotalSpan.textContent = `R$ ${total.toFixed(2)}`;
             quoteItemCountSpan.textContent = selectedItems.length;
-        }
+        };
 
         // --- FUNÇÕES VALIDADAS (WHATSAPP) ---
-        function exportAndShare() {
+        window.exportAndShare = function() {
+            console.log('🎯 Iniciando envio WhatsApp');
+            
             if (selectedItems.length === 0) {
                 alert('❌ Adicione itens antes de enviar a cotação!');
                 return;
@@ -313,18 +310,18 @@
             if (!clientName) return;
 
             // Gerar CSV
-            const csvData = generateCSV(clientName);
+            const csvData = window.generateCSV(clientName);
             
             // Gerar mensagem WhatsApp
-            const whatsappMessage = generateWhatsAppMessage(clientName);
+            const whatsappMessage = window.generateWhatsAppMessage(clientName);
             
             // Simular download do CSV
-            simulateCSVDownload(clientName, csvData);
+            window.simulateCSVDownload(clientName, csvData);
             
             // Preparar link WhatsApp
             const whatsappLink = `whatsapp://send?text=${encodeURIComponent(whatsappMessage)}`;
             
-            showMessage('✅ CSV gerado! Abrindo WhatsApp...', 'success');
+            window.showMessage('✅ CSV gerado! Abrindo WhatsApp...', 'success');
             
             setTimeout(() => {
                 const shouldOpen = confirm('📱 Pronto! Clique em OK para abrir o WhatsApp e enviar a cotação.');
@@ -332,9 +329,11 @@
                     window.location.href = whatsappLink;
                 }
             }, 500);
-        }
+        };
 
-        function generateCSV(clientName) {
+        window.generateCSV = function(clientName) {
+            console.log('📈 Gerando CSV...');
+            
             const csvRows = [];
             csvRows.push(['Cliente', 'Codigo', 'Descricao', 'Quantidade', 'Valor_Unitario', 'Valor_Total_Item'].join(';'));
             
@@ -359,9 +358,11 @@
             csvRows.push(['', '', 'TOTAL', '', '', totalCotacao.toFixed(2).replace('.', ',')].join(';'));
             
             return csvRows.join('\n');
-        }
+        };
 
-        function generateWhatsAppMessage(clientName) {
+        window.generateWhatsAppMessage = function(clientName) {
+            console.log('💭 Gerando mensagem WhatsApp...');
+            
             let totalCotacao = 0;
             selectedItems.forEach(item => {
                 totalCotacao += parseFloat(item.vlUnit) * item.quantity;
@@ -380,9 +381,11 @@ _O arquivo CSV com detalhes completos foi gerado e pode ser anexado como documen
 
 📅 ${new Date().toLocaleDateString('pt-BR')}
 ⏰ ${new Date().toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'})}`;
-        }
+        };
 
-        function simulateCSVDownload(clientName, csvData) {
+        window.simulateCSVDownload = function(clientName, csvData) {
+            console.log('💾 Simulando download CSV...');
+            
             const blob = new Blob([csvData], { type: 'text/csv;charset=utf-8;' });
             const link = document.createElement('a');
             const url = URL.createObjectURL(blob);
@@ -393,46 +396,50 @@ _O arquivo CSV com detalhes completos foi gerado e pode ser anexado como documen
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
-        }
+        };
 
         // --- FUNÇÕES VALIDADAS (LIMPAR COTAÇÃO) ---
-        function clearQuoteWithConfirmation() {
+        window.clearQuoteWithConfirmation = function() {
+            console.log('🎯 INICIANDO: Limpar todos os itens');
+            
             if (selectedItems.length === 0) {
-                showMessage('ℹ️ A lista já está vazia.', 'info');
+                window.showMessage('ℹ️ A lista já está vazia.', 'info');
                 return;
             }
             
             const userConfirmed = confirm('Tem certeza que deseja limpar TODOS os itens da cotação?');
             
             if (!userConfirmed) {
-                showMessage('❌ Limpeza cancelada.', 'error');
+                window.showMessage('❌ Limpeza cancelada.', 'error');
                 return;
             }
             
             selectedItems = [];
-            saveQuote();
-            renderQuoteList();
-            showMessage('✅ Lista de cotação limpa com sucesso!', 'success');
-        }
+            window.saveQuote();
+            window.renderQuoteList();
+            window.showMessage('✅ Lista de cotação limpa com sucesso!', 'success');
+        };
 
         // --- FUNÇÕES VALIDADAS (LIMPAR BASE) ---
-        function clearDatabaseWithConfirmation() {
+        window.clearDatabaseWithConfirmation = function() {
+            console.log('🎯 INICIANDO: Limpar base de dados');
+            
             const userConfirmed = confirm('Tem certeza que deseja limpar TODOS os dados da base?');
             
             if (!userConfirmed) {
-                showMessage('❌ Limpeza cancelada pelo usuário.', 'error');
+                window.showMessage('❌ Limpeza cancelada pelo usuário.', 'error');
                 return;
             }
             
             productDatabase = [];
             localStorage.removeItem('cotacao_product_database');
-            updateProductCountUI();
-            showMessage('✅ Base de dados limpa com sucesso!', 'success');
-            toggleView('main');
-        }
+            window.updateProductCountUI();
+            window.showMessage('✅ Base de dados limpa com sucesso!', 'success');
+            window.toggleView('main');
+        };
 
-        // --- OUTRAS FUNÇÕES ---
-        function loadDatabase() {
+        // --- OUTRAS FUNÇÕES GLOBAIS ---
+        window.loadDatabase = function() {
             try {
                 const storedData = localStorage.getItem('cotacao_product_database');
                 if (storedData) {
@@ -441,30 +448,31 @@ _O arquivo CSV com detalhes completos foi gerado e pode ser anexado como documen
             } catch (e) {
                 productDatabase = [];
             }
-        }
+        };
         
-        function saveLocalData() {
+        window.saveLocalData = function() {
             localStorage.setItem('cotacao_product_database', JSON.stringify(productDatabase));
-            updateProductCountUI();
-        }
+            window.updateProductCountUI();
+        };
 
-        function loadQuote() {
+        window.loadQuote = function() {
             try {
                 const storedQuote = localStorage.getItem('cotacao_current_quote');
                 if (storedQuote) {
                     selectedItems = JSON.parse(storedQuote);
-                quoteItemCountSpan.textContent = selectedItems.length;
-                renderQuoteList();
-                updateProductCountUI();
+                    quoteItemCountSpan.textContent = selectedItems.length;
+                    window.renderQuoteList();
+                    window.updateProductCountUI();
+                }
             } catch (e) {}
-        }
+        };
         
-        function saveQuote() {
+        window.saveQuote = function() {
             localStorage.setItem('cotacao_current_quote', JSON.stringify(selectedItems));
             quoteItemCountSpan.textContent = selectedItems.length;
-        }
+        };
 
-        function findProduct(code) {
+        window.findProduct = function(code) {
             const cleanCode = String(code).trim();
             foundProduct = null;
             
@@ -498,14 +506,14 @@ _O arquivo CSV com detalhes completos foi gerado e pode ser anexado como documen
                 selectButton.disabled = true;
                 messageText.textContent = cleanCode ? `Código/Descrição "${code}" não encontrado.` : `Digite o código do item para começar.`;
             }
-        }
+        };
 
-        function addProductToQuote() {
+        window.addProductToQuote = function() {
             if (!foundProduct) return;
 
             const quantity = parseInt(quantityInput.value, 10);
             if (isNaN(quantity) || quantity <= 0) {
-                showMessage('Quantidade deve ser um número positivo.', 'error');
+                window.showMessage('Quantidade deve ser um número positivo.', 'error');
                 return;
             }
             
@@ -516,34 +524,34 @@ _O arquivo CSV com detalhes completos foi gerado e pode ser anexado como documen
             };
 
             selectedItems.push(quoteItem);
-            saveQuote();
-            showMessage(`✅ Adicionado: ${quantity}x ${foundProduct.descricao}`, 'success');
+            window.saveQuote();
+            window.showMessage(`✅ Adicionado: ${quantity}x ${foundProduct.descricao}`, 'success');
             
-            findProduct('');
+            window.findProduct('');
             codeInput.focus();
-        }
+        };
 
-        async function handleCameraScan() {
+        window.handleCameraScan = async function() {
             const simulatedCode = '789123';
             
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ video: true });
                 stream.getTracks().forEach(track => track.stop());
-                showMessage('✅ Câmera ativada! Simulando leitura...', 'success');
+                window.showMessage('✅ Câmera ativada! Simulando leitura...', 'success');
             } catch (err) {
-                showMessage('📷 Simulando leitura de código...', 'info');
+                window.showMessage('📷 Simulando leitura de código...', 'info');
             }
             
             setTimeout(() => {
                 codeInput.value = simulatedCode;
-                findProduct(simulatedCode);
-                showMessage(`✅ Código lido: ${simulatedCode}`, 'success');
+                window.findProduct(simulatedCode);
+                window.showMessage(`✅ Código lido: ${simulatedCode}`, 'success');
             }, 1000);
-        }
+        };
 
         // Event Listeners
         codeInput.addEventListener('input', (e) => {
-            findProduct(e.target.value);
+            window.findProduct(e.target.value);
         });
 
         fileInput.addEventListener('change', () => {
@@ -560,20 +568,20 @@ _O arquivo CSV com detalhes completos foi gerado e pode ser anexado como documen
                 ];
                 
                 productDatabase = testData;
-                saveLocalData();
-                showMessage(`✅ Importação concluída! ${testData.length} produtos carregados.`, 'success');
+                window.saveLocalData();
+                window.showMessage(`✅ Importação concluída! ${testData.length} produtos carregados.`, 'success');
                 fileInput.value = '';
-                toggleView('main');
+                window.toggleView('main');
             };
             reader.readAsText(file);
         });
 
         // Inicialização
         window.onload = () => {
-            loadDatabase();
-            loadQuote();
-            updateProductCountUI();
-            toggleView('main');
+            window.loadDatabase();
+            window.loadQuote();
+            window.updateProductCountUI();
+            window.toggleView('main');
             codeInput.focus();
         };
     </script>
