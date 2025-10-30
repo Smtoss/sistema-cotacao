@@ -1,0 +1,1041 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cotação de Vendas - Offline (Corrigido)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3ffef; 
+        }
+        .view-container {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-start;
+            align-items: center;
+            padding: 16px;
+        }
+        .card {
+            width: 100%;
+            max-width: 500px;
+            background-color: #ffffff;
+            padding: 24px;
+            border-radius: 1rem;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+            border-top: 8px solid #10b981;
+        }
+        .btn-primary {
+            background-color: #10b981;
+            transition: all 0.2s;
+        }
+        .btn-primary:hover {
+            background-color: #059669;
+            transform: scale(1.02);
+            box-shadow: 0 4px 8px rgba(16, 185, 129, 0.3);
+        }
+        .overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(17, 24, 39, 0.95);
+            z-index: 50;
+            backdrop-filter: blur(4px);
+            overflow-y: auto;
+            display: none;
+            padding: 16px;
+        }
+        .overlay-content {
+            background-color: #ffffff;
+            border-radius: 1rem;
+            padding: 24px;
+            margin: 40px auto;
+            width: 100%;
+            max-width: 600px;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+            position: relative;
+        }
+        .search-result {
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+        .search-result:hover {
+            background-color: #f0fdf4;
+            transform: translateX(4px);
+        }
+        /* Estilos para a câmera */
+        #cameraModal {
+            z-index: 100;
+        }
+        #cameraContainer {
+            position: relative;
+            width: 100%;
+            height: 300px;
+            background: #000;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        #cameraVideo {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        #scanArea {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 80%;
+            height: 120px;
+            border: 3px solid #4CAF50;
+            background: rgba(76, 175, 80, 0.1);
+            z-index: 10;
+            border-radius: 8px;
+        }
+        .compact-header {
+            transition: all 0.3s ease;
+        }
+        .compact-header.hidden {
+            opacity: 0;
+            height: 0;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+        }
+        /* Modal de senha */
+        #passwordModal {
+            z-index: 1000;
+        }
+    </style>
+</head>
+<body>
+    
+    <!-- Modal de Senha -->
+    <div id="passwordModal" class="overlay">
+        <div class="overlay-content max-w-sm">
+            <h2 class="text-2xl font-bold text-gray-800 mb-4 text-center">🔒 Acesso Restrito</h2>
+            <p class="text-sm text-gray-600 mb-4 text-center">Digite a senha para acessar o sistema</p>
+            
+            <input type="password" id="passwordInput" placeholder="Digite a senha" 
+                class="w-full p-3 border border-gray-300 rounded-lg text-center text-lg font-mono mb-4 focus:ring-indigo-500 focus:border-indigo-500"
+                onkeypress="handlePasswordKeypress(event)">
+            
+            <button onclick="checkPassword()" class="w-full bg-indigo-500 hover:bg-indigo-600 text-white font-semibold py-3 rounded-lg transition duration-200">
+                🔓 Acessar Sistema
+            </button>
+
+            <div class="mt-4 text-center">
+                <p class="text-xs text-gray-500">Coloque a Senha!</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal da Câmera -->
+    <div id="cameraModal" class="overlay hidden">
+        <div class="overlay-content">
+            <h2 class="text-2xl font-bold text-gray-800 mb-4 text-center">📷 Escanear Código de Barras</h2>
+            
+            <button onclick="window.closeCamera()" class="absolute top-4 right-4 text-gray-500 hover:text-gray-900 transition duration-200">
+                ✕
+            </button>
+
+            <div id="cameraContainer">
+                <video id="cameraVideo" autoplay playsinline></video>
+                <div id="scanArea"></div>
+            </div>
+
+            <div class="mt-4 text-center">
+                <p class="text-sm text-gray-600">Posicione o código de barras dentro da área verde</p>
+            </div>
+
+            <div class="mt-4 flex gap-3">
+                <button onclick="window.startCamera()" class="flex-1 bg-green-500 hover:bg-green-600 text-white font-semibold py-3 rounded-lg transition duration-200">
+                    🎥 Iniciar Câmera
+                </button>
+                <button onclick="window.simulateBarcode()" class="flex-1 bg-blue-500 hover:bg-blue-600 text-white font-semibold py-3 rounded-lg transition duration-200">
+                    🔢 Simular Código
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Overlay de Gerenciamento -->
+    <div id="managementOverlay" class="overlay">
+        <div class="overlay-content">
+            <h2 class="text-2xl font-bold text-gray-800 mb-4 text-center">Gerenciar Base de Produtos</h2>
+            <p class="text-sm text-gray-500 mb-6 text-center">Base atual com <span id="currentProductCount" class="font-bold text-indigo-600">0</span> produtos.</p>
+            
+            <button onclick="toggleView('main')" class="absolute top-4 right-4 text-gray-500 hover:text-gray-900 transition duration-200">
+                ✕
+            </button>
+
+            <div class="space-y-6">
+                <div class="border border-indigo-200 p-4 rounded-lg bg-indigo-50">
+                    <h3 class="text-lg font-semibold text-indigo-700 mb-3">1. Importar Arquivo Local (.csv ou .txt)</h3>
+                    <input type="file" id="fileInput" accept=".csv, .txt" class="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-indigo-100 file:text-indigo-700 hover:file:bg-indigo-200"/>
+                    <p class="text-xs text-gray-500 mt-2">Selecione um arquivo CSV/TXT. A importação é automática após a seleção.</p>
+                </div>
+
+                <button onclick="clearDatabaseWithConfirmation()" class="w-full bg-red-500 hover:bg-red-600 text-white font-semibold py-3 rounded-lg transition duration-200 shadow-md flex items-center justify-center">
+                    🗑️ Limpar Base Local (Apaga Todos os Produtos)
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Overlay de Opções/Lista de Cotação -->
+    <div id="optionsOverlay" class="overlay">
+        <div class="overlay-content">
+            <h2 class="text-2xl font-bold text-gray-800 mb-4 text-center">Itens Selecionados</h2>
+            
+            <button onclick="toggleView('main')" class="absolute top-4 right-4 text-gray-500 hover:text-gray-900 transition duration-200">
+                ✕
+            </button>
+            
+            <div id="selectedItemsList" class="divide-y divide-gray-200 mb-4 max-h-96 overflow-y-auto">
+                <!-- Itens serão renderizados aqui -->
+            </div>
+
+            <div class="bg-emerald-50 p-4 rounded-lg flex justify-between items-center mb-6 shadow-inner">
+                <span class="text-lg font-semibold text-gray-700">Total da Cotação:</span>
+                <span id="quoteTotal" class="text-2xl font-bold text-emerald-700">R$ 0,00</span>
+            </div>
+
+            <div class="flex flex-col gap-3">
+                <button onclick="exportAndShare()" class="btn-primary w-full text-white font-semibold py-3 rounded-lg shadow-md flex items-center justify-center">
+                    📱 ENVIAR COTAÇÃO (WhatsApp)
+                </button>
+                <button onclick="clearQuoteWithConfirmation()" class="w-full bg-gray-500 hover:bg-gray-600 text-white font-semibold py-3 rounded-lg transition duration-200 shadow-md">
+                    Limpar Lista de Cotação
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tela Principal -->
+    <div id="mainQuotationView" class="view-container hidden">
+        <div class="card">
+            <!-- Cabeçalho compacto que some durante a busca -->
+            <div id="compactHeader" class="compact-header text-center mb-4">
+                <h1 class="text-xl sm:text-2xl font-bold text-gray-800">Nova Cotação</h1>
+                <p class="text-sm text-gray-500 mt-2">
+                    <span id="mainProductCount" class="font-bold text-indigo-600">0</span> produtos carregados.
+                    <button onclick="toggleView('management')" class="text-indigo-500 hover:text-indigo-700 font-semibold underline ml-1">Gerenciar Base</button>
+                </p>
+            </div>
+
+            <!-- Campo de Busca NO TOPO DA TELA -->
+            <div class="mb-4">
+                <label for="codeInput" class="block text-sm font-medium text-gray-700 mb-2 text-center">
+                    CÓDIGO DE BARRAS / BUSCA POR DESCRIÇÃO
+                </label>
+                <div class="flex gap-2">
+                    <input type="text" id="codeInput" placeholder="Digite código ou descrição (ex: 'moni pol')" 
+                        class="flex-grow p-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 text-base text-center font-mono"
+                        onkeypress="handleSearchKeypress(event)">
+                    <button onclick="window.openCamera()" class="bg-indigo-500 hover:bg-indigo-600 text-white p-3 rounded-lg shadow-md flex items-center justify-center transition duration-200">
+                        📷
+                    </button>
+                </div>
+            </div>
+
+            <!-- Resultados da Busca SQL Like - MAIOR E MAIS VISÍVEL -->
+            <div id="searchResults" class="mb-4 max-h-96 overflow-y-auto border border-gray-200 rounded-lg hidden">
+                <div class="p-3 border-b border-gray-100 bg-indigo-50">
+                    <p class="text-sm font-semibold text-indigo-700">Resultados da Busca: <span id="resultsCount" class="text-indigo-600">0</span> produtos encontrados</p>
+                </div>
+                <div id="resultsList" class="divide-y divide-gray-100">
+                    <!-- Resultados aparecem aqui -->
+                </div>
+            </div>
+
+            <!-- Área do Produto Selecionado - SOMENTE QUANDO HÁ PRODUTO SELECIONADO -->
+            <div id="productDisplay" class="border border-dashed border-gray-300 p-4 rounded-lg bg-gray-50 transition-all duration-300 min-h-[120px] flex flex-col justify-center items-center text-center hidden">
+                <div id="productDetails" class="w-full space-y-2">
+                    <p class="text-lg font-bold text-gray-800" id="displayDescricao"></p>
+                    <p class="text-sm text-gray-600">Cód.: <span id="displayCodigo" class="font-semibold"></span></p>
+                    <p class="text-2xl font-extrabold text-emerald-600" id="displayVLUnit"></p>
+                    <p class="text-sm text-gray-500">Unidade: <span id="displayUnidade" class="font-semibold text-gray-700">UN</span></p>
+
+                    <div class="pt-3">
+                        <label for="quantityInput" class="block text-sm font-medium text-gray-700 mb-1">QUANTIDADE</label>
+                        <input type="number" id="quantityInput" value="1" min="1" 
+                            class="w-20 p-2 border border-gray-300 rounded-lg text-center font-semibold text-base mx-auto block focus:ring-indigo-500 focus:border-indigo-500"
+                            onkeypress="handleQuantityKeypress(event)">
+                    </div>
+                </div>
+            </div>
+
+            <div class="mt-4 flex flex-col gap-3">
+                <button onclick="addProductToQuote()" id="selectButton" disabled
+                    class="btn-primary w-full text-white font-semibold py-3 rounded-lg shadow-xl text-lg disabled:opacity-50 disabled:cursor-not-allowed transition duration-200 flex items-center justify-center">
+                    ➕ ADICIONAR À COTAÇÃO
+                </button>
+                
+                <button onclick="toggleView('options')"
+                    class="w-full bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold py-3 rounded-lg transition duration-200 shadow-md flex items-center justify-center">
+                    ⚙️ OPÇÕES (<span id="quoteItemCount">0</span> itens)
+                </button>
+            </div>
+
+            <!-- Rodapé com informações -->
+            <div class="mt-6 pt-4 border-t border-gray-200 text-center">
+                <p class="text-xs text-gray-500">
+                    <span id="footerProductCount" class="font-bold text-indigo-600">0</span> produtos na base • 
+                    <button onclick="toggleView('management')" class="text-indigo-500 hover:text-indigo-700 font-semibold underline">Gerenciar</button>
+                </p>
+            </div>
+        </div>
+
+        <div id="messageBox" class="fixed bottom-4 right-4 p-3 rounded-lg shadow-xl text-sm z-50 hidden transition-all duration-300"></div>
+    </div>
+
+    <script>
+        // --- CONFIGURAÇÃO DA SENHA ---
+        const SYSTEM_PASSWORD = "653674"; // SENHA DO SISTEMA - PODE ALTERAR AQUI
+
+        // --- VARIÁVEIS DE ESTADO ---
+        let productDatabase = [];
+        let selectedItems = [];
+        let foundProduct = null;
+        let cameraStream = null;
+
+        // --- REFERÊNCIAS DO DOM ---
+        const mainView = document.getElementById('mainQuotationView');
+        const optionsView = document.getElementById('optionsOverlay');
+        const managementView = document.getElementById('managementOverlay');
+        const cameraModal = document.getElementById('cameraModal');
+        const passwordModal = document.getElementById('passwordModal');
+        const codeInput = document.getElementById('codeInput');
+        const quantityInput = document.getElementById('quantityInput');
+        const selectButton = document.getElementById('selectButton');
+        const productDisplay = document.getElementById('productDisplay');
+        const productDetailsDiv = document.getElementById('productDetails');
+        const selectedItemsList = document.getElementById('selectedItemsList');
+        const quoteTotalSpan = document.getElementById('quoteTotal');
+        const quoteItemCountSpan = document.getElementById('quoteItemCount');
+        const messageBox = document.getElementById('messageBox');
+        const fileInput = document.getElementById('fileInput');
+        const currentProductCountSpan = document.getElementById('currentProductCount');
+        const mainProductCountSpan = document.getElementById('mainProductCount');
+        const footerProductCount = document.getElementById('footerProductCount');
+        const searchResults = document.getElementById('searchResults');
+        const resultsList = document.getElementById('resultsList');
+        const cameraVideo = document.getElementById('cameraVideo');
+        const resultsCount = document.getElementById('resultsCount');
+        const compactHeader = document.getElementById('compactHeader');
+        const passwordInput = document.getElementById('passwordInput');
+
+        // --- SISTEMA DE SENHA ---
+        function checkPassword() {
+            const enteredPassword = passwordInput.value.trim();
+            
+            if (enteredPassword === SYSTEM_PASSWORD) {
+                passwordModal.style.display = 'none';
+                mainView.classList.remove('hidden');
+                window.loadDatabase();
+                window.loadQuote();
+                window.updateProductCountUI();
+                codeInput.focus();
+                window.showMessage('✅ Acesso permitido!', 'success');
+            } else {
+                passwordInput.value = '';
+                passwordInput.focus();
+                window.showMessage('❌ Senha incorreta! Tente novamente.', 'error');
+            }
+        }
+
+        function handlePasswordKeypress(event) {
+            if (event.key === 'Enter') {
+                checkPassword();
+            }
+        }
+
+        // --- FUNÇÃO PARA FECHAR TECLADO ---
+        function closeKeyboard() {
+            // Foca em um elemento não editável para fechar o teclado
+            const dummyElement = document.createElement('input');
+            dummyElement.style.position = 'absolute';
+            dummyElement.style.opacity = '0';
+            dummyElement.style.height = '0';
+            dummyElement.style.fontSize = '16px'; // Prevenir zoom no iOS
+            document.body.appendChild(dummyElement);
+            dummyElement.focus();
+            setTimeout(() => {
+                document.body.removeChild(dummyElement);
+            }, 100);
+        }
+
+        // --- HANDLERS PARA TECLAS ENTER ---
+        function handleSearchKeypress(event) {
+            if (event.key === 'Enter') {
+                closeKeyboard();
+                // Foca no primeiro resultado se houver, senão mantém no campo
+                const firstResult = document.querySelector('.search-result');
+                if (firstResult) {
+                    firstResult.focus();
+                }
+            }
+        }
+
+        function handleQuantityKeypress(event) {
+            if (event.key === 'Enter') {
+                closeKeyboard();
+                addProductToQuote();
+            }
+        }
+
+        // --- FUNÇÕES GLOBAIS ---
+
+        // Funções de UI
+        window.showMessage = function(message, type) {
+            messageBox.textContent = message;
+            messageBox.className = 'fixed bottom-4 right-4 p-3 rounded-lg shadow-xl text-sm z-50 transition-all duration-300 block';
+            
+            if (type === 'success') {
+                messageBox.classList.add('bg-green-500', 'text-white');
+            } else if (type === 'error') {
+                messageBox.classList.add('bg-red-500', 'text-white');
+            } else {
+                messageBox.classList.add('bg-indigo-500', 'text-white');
+            }
+
+            setTimeout(() => {
+                messageBox.classList.add('hidden');
+            }, 3000);
+        };
+
+        window.toggleView = function(viewName) {
+            mainView.style.display = 'none';
+            optionsView.style.display = 'none';
+            managementView.style.display = 'none';
+            cameraModal.style.display = 'none';
+            
+            if (viewName === 'main') {
+                mainView.style.display = 'flex';
+                window.findProduct('');
+            } else if (viewName === 'options') {
+                window.renderQuoteList();
+                optionsView.style.display = 'block';
+            } else if (viewName === 'management') {
+                window.updateProductCountUI();
+                managementView.style.display = 'block';
+            } else if (viewName === 'camera') {
+                cameraModal.style.display = 'block';
+            }
+        };
+
+        // --- CÂMERA E SCANNER ---
+        window.openCamera = function() {
+            window.toggleView('camera');
+        };
+
+        window.closeCamera = function() {
+            if (cameraStream) {
+                cameraStream.getTracks().forEach(track => track.stop());
+                cameraStream = null;
+            }
+            window.toggleView('main');
+        };
+
+        window.startCamera = async function() {
+            try {
+                cameraStream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { 
+                        facingMode: 'environment',
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 }
+                    } 
+                });
+                cameraVideo.srcObject = cameraStream;
+                window.showMessage('✅ Câmera iniciada! Aponte para o código de barras.', 'success');
+            } catch (err) {
+                console.error('Erro ao acessar câmera:', err);
+                window.showMessage('❌ Não foi possível acessar a câmera. Use a simulação.', 'error');
+            }
+        };
+
+        window.simulateBarcode = function() {
+            const simulatedCodes = ['789123', '456789', '123456', '789012', '345678'];
+            const randomCode = simulatedCodes[Math.floor(Math.random() * simulatedCodes.length)];
+            
+            window.closeCamera();
+            codeInput.value = randomCode;
+            window.findProduct(randomCode);
+            window.showMessage(`✅ Código simulado: ${randomCode}`, 'success');
+        };
+
+        // --- BUSCA SQL LIKE MELHORADA ---
+        window.findProduct = function(searchTerm) {
+            const cleanSearch = String(searchTerm).trim();
+            foundProduct = null;
+            
+            // Esconde resultados anteriores e produto selecionado
+            window.hideSearchResults();
+            productDisplay.classList.add('hidden');
+            selectButton.disabled = true;
+            
+            // Controla visibilidade do cabeçalho
+            if (cleanSearch.length > 0) {
+                compactHeader.classList.add('hidden');
+            } else {
+                compactHeader.classList.remove('hidden');
+            }
+            
+            if (!cleanSearch) {
+                return;
+            }
+
+            // 1. Busca exata por código (prioridade máxima)
+            const exactCodeMatch = productDatabase.find(p => 
+                String(p.codigo).toUpperCase() === cleanSearch.toUpperCase()
+            );
+
+            if (exactCodeMatch) {
+                displayProduct(exactCodeMatch);
+                return;
+            }
+
+            // 2. Busca SQL Like por descrição (com múltiplas palavras)
+            if (cleanSearch.length >= 2) {
+                const searchFragments = cleanSearch.toUpperCase().split(' ').filter(frag => frag.length >= 2);
+                
+                if (searchFragments.length > 0) {
+                    const descriptionMatches = productDatabase.filter(product => {
+                        const cleanDesc = product.descricao.toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+                        
+                        // TODOS os fragmentos devem estar presentes na descrição (AND)
+                        return searchFragments.every(fragment => {
+                            const cleanFragment = fragment.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+                            return cleanDesc.includes(cleanFragment);
+                        });
+                    });
+
+                    if (descriptionMatches.length > 0) {
+                        if (descriptionMatches.length === 1) {
+                            // Se só tem um resultado, seleciona automaticamente
+                            displayProduct(descriptionMatches[0]);
+                        } else {
+                            // Se tem múltiplos resultados, mostra lista
+                            showSearchResults(descriptionMatches, searchFragments);
+                        }
+                        return;
+                    }
+                }
+            }
+
+            // Nada encontrado - mantém tudo oculto
+        };
+
+        function displayProduct(product) {
+            foundProduct = product;
+            productDisplay.classList.remove('hidden');
+            selectButton.disabled = false;
+            
+            // CORREÇÃO DO PREÇO: Converte corretamente string para número
+            let rawValue = product.vlUnit || '0.00';
+            // Remove possíveis R$ e espaços, depois converte vírgula para ponto
+            let cleanValue = String(rawValue).replace('R$', '').replace(/\s/g, '').replace(',', '.');
+            let value = parseFloat(cleanValue);
+            
+            // Se não for número válido, tenta outra abordagem
+            if (isNaN(value)) {
+                value = parseFloat(String(rawValue).replace(/[^\d,]/g, '').replace(',', '.'));
+            }
+            
+            document.getElementById('displayDescricao').textContent = product.descricao;
+            document.getElementById('displayCodigo').textContent = product.codigo;
+            document.getElementById('displayVLUnit').textContent = isNaN(value) ? 'R$ 0,00' : `R$ ${value.toFixed(2).replace('.', ',')}`;
+            document.getElementById('displayUnidade').textContent = product.unidade || 'UN';
+            quantityInput.value = 1;
+            
+            window.hideSearchResults();
+        }
+
+        function showSearchResults(results, searchFragments) {
+            resultsList.innerHTML = '';
+            resultsCount.textContent = results.length;
+            
+            results.forEach(product => {
+                const resultElement = document.createElement('div');
+                resultElement.className = 'search-result p-3 cursor-pointer hover:bg-green-50';
+                resultElement.onclick = () => {
+                    codeInput.value = product.codigo;
+                    displayProduct(product);
+                    window.showMessage(`✅ "${product.descricao}" selecionado!`, 'success');
+                };
+                
+                // CORREÇÃO DO PREÇO: Mesma lógica de conversão
+                let rawValue = product.vlUnit || '0.00';
+                let cleanValue = String(rawValue).replace('R$', '').replace(/\s/g, '').replace(',', '.');
+                let value = parseFloat(cleanValue);
+                if (isNaN(value)) {
+                    value = parseFloat(String(rawValue).replace(/[^\d,]/g, '').replace(',', '.'));
+                }
+                const formattedPrice = isNaN(value) ? 'R$ 0,00' : `R$ ${value.toFixed(2).replace('.', ',')}`;
+                
+                resultElement.innerHTML = `
+                    <div class="flex justify-between items-start">
+                        <div class="flex-1">
+                            <p class="font-semibold text-gray-800 text-sm mb-1">${highlightSearchFragments(product.descricao, searchFragments)}</p>
+                            <p class="text-xs text-gray-600">Cód: ${product.codigo} | Unid: ${product.unidade || 'UN'}</p>
+                        </div>
+                        <div class="text-right ml-2">
+                            <p class="font-bold text-emerald-700 text-sm">${formattedPrice}</p>
+                            <span class="bg-indigo-500 text-white px-2 py-1 rounded text-xs">Selecionar</span>
+                        </div>
+                    </div>
+                `;
+                resultsList.appendChild(resultElement);
+            });
+            
+            searchResults.classList.remove('hidden');
+        }
+
+        function highlightSearchFragments(text, fragments) {
+            let highlightedText = text.toUpperCase();
+            fragments.forEach(fragment => {
+                const regex = new RegExp(`(${fragment})`, 'gi');
+                highlightedText = highlightedText.replace(regex, '<span class="bg-yellow-200 font-bold">$1</span>');
+            });
+            return highlightedText;
+        }
+
+        window.hideSearchResults = function() {
+            searchResults.classList.add('hidden');
+        };
+
+        // --- FUNÇÕES EXISTENTES (COM CORREÇÃO DO PREÇO) ---
+        
+        window.updateProductCountUI = function() {
+            const count = productDatabase.length;
+            currentProductCountSpan.textContent = count;
+            mainProductCountSpan.textContent = count;
+            footerProductCount.textContent = count;
+        };
+
+        window.removeItem = function(itemId) {
+            const item = selectedItems.find(i => i.id === itemId);
+            if (!item) return;
+            
+            const userConfirmed = confirm(`Deseja realmente excluir "${item.descricao}" da lista?`);
+            if (!userConfirmed) {
+                window.showMessage('❌ Exclusão cancelada.', 'error');
+                return;
+            }
+            
+            selectedItems = selectedItems.filter(i => i.id !== itemId);
+            window.saveQuote();
+            window.renderQuoteList();
+            window.showMessage(`✅ "${item.descricao}" removido com sucesso!`, 'success');
+        };
+
+        window.renderQuoteList = function() {
+            selectedItemsList.innerHTML = '';
+            let total = 0;
+
+            if (selectedItems.length === 0) {
+                selectedItemsList.innerHTML = '<p class="text-center text-gray-500 py-4">Nenhum item selecionado para esta cotação.</p>';
+                quoteTotalSpan.textContent = 'R$ 0,00';
+                return;
+            }
+
+            selectedItems.forEach(item => {
+                // CORREÇÃO DO PREÇO: Mesma lógica de conversão
+                let rawValue = item.vlUnit || '0.00';
+                let cleanValue = String(rawValue).replace('R$', '').replace(/\s/g, '').replace(',', '.');
+                let value = parseFloat(cleanValue);
+                if (isNaN(value)) {
+                    value = parseFloat(String(rawValue).replace(/[^\d,]/g, '').replace(',', '.'));
+                }
+                
+                const totalItem = isNaN(value) ? 0 : value * item.quantity;
+                total += totalItem;
+                
+                const itemElement = document.createElement('div');
+                itemElement.className = 'flex justify-between items-center p-3 border-b border-gray-100 hover:bg-gray-50';
+                itemElement.innerHTML = `
+                    <div class="flex-grow min-w-0 pr-3">
+                        <p class="text-base font-semibold text-gray-800">${item.descricao}</p>
+                        <p class="text-xs text-gray-600">Cód: ${item.codigo} | Qtd: <span class="font-bold text-indigo-600">${item.quantity}</span></p>
+                        <p class="text-sm font-bold text-emerald-700">R$ ${totalItem.toFixed(2).replace('.', ',')}</p>
+                    </div>
+                    <button onclick="removeItem('${item.id}')" 
+                            class="text-red-600 hover:text-red-900 transition p-2 rounded-full hover:bg-red-100 flex-shrink-0"
+                            title="Remover Item">
+                        🗑️
+                    </button>
+                `;
+                selectedItemsList.appendChild(itemElement);
+            });
+
+            quoteTotalSpan.textContent = `R$ ${total.toFixed(2).replace('.', ',')}`;
+            quoteItemCountSpan.textContent = selectedItems.length;
+        };
+
+        window.exportAndShare = function() {
+            if (selectedItems.length === 0) {
+                alert('❌ Adicione itens antes de enviar a cotação!');
+                return;
+            }
+            
+            const clientName = prompt('📝 Digite o nome do cliente:');
+            if (!clientName) return;
+
+            // Gera o CSV mas não mostra download
+            const csvData = window.generateCSV(clientName);
+            const whatsappMessage = window.generateWhatsAppMessage(clientName);
+            
+            // Cria o CSV silenciosamente sem mostrar download
+            const blob = new Blob([csvData], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            
+            // Abre WhatsApp diretamente sem confirmação extra
+            const whatsappLink = `whatsapp://send?text=${encodeURIComponent(whatsappMessage)}`;
+            
+            window.showMessage('📱 Abrindo WhatsApp...', 'success');
+            
+            // Abre WhatsApp diretamente
+            setTimeout(() => {
+                window.location.href = whatsappLink;
+                
+                // Limpa o URL do blob após um tempo
+                setTimeout(() => {
+                    URL.revokeObjectURL(url);
+                }, 1000);
+            }, 500);
+        };
+
+        window.generateCSV = function(clientName) {
+            const csvRows = [];
+            csvRows.push(['Cliente', 'Codigo', 'Descricao', 'Quantidade', 'Valor_Unitario', 'Valor_Total_Item'].join(';'));
+            
+            let totalCotacao = 0;
+            
+            selectedItems.forEach(item => {
+                // CORREÇÃO DO PREÇO: Mesma lógica de conversão
+                let rawValue = item.vlUnit || '0.00';
+                let cleanValue = String(rawValue).replace('R$', '').replace(/\s/g, '').replace(',', '.');
+                let valorUnitario = parseFloat(cleanValue);
+                if (isNaN(valorUnitario)) {
+                    valorUnitario = parseFloat(String(rawValue).replace(/[^\d,]/g, '').replace(',', '.'));
+                }
+                
+                const totalItem = isNaN(valorUnitario) ? 0 : valorUnitario * item.quantity;
+                totalCotacao += totalItem;
+                
+                const row = [
+                    clientName,
+                    item.codigo,
+                    item.descricao.replace(/;/g, ','),
+                    item.quantity,
+                    (isNaN(valorUnitario) ? '0.00' : valorUnitario.toFixed(2)).replace('.', ','),
+                    totalItem.toFixed(2).replace('.', ',')
+                ];
+                csvRows.push(row.join(';'));
+            });
+            
+            csvRows.push(['', '', 'TOTAL', '', '', totalCotacao.toFixed(2).replace('.', ',')].join(';'));
+            
+            return csvRows.join('\n');
+        };
+
+        window.generateWhatsAppMessage = function(clientName) {
+            let totalCotacao = 0;
+            selectedItems.forEach(item => {
+                // CORREÇÃO DO PREÇO: Mesma lógica de conversão
+                let rawValue = item.vlUnit || '0.00';
+                let cleanValue = String(rawValue).replace('R$', '').replace(/\s/g, '').replace(',', '.');
+                let value = parseFloat(cleanValue);
+                if (isNaN(value)) {
+                    value = parseFloat(String(rawValue).replace(/[^\d,]/g, '').replace(',', '.'));
+                }
+                totalCotacao += isNaN(value) ? 0 : value * item.quantity;
+            });
+            
+            return `*COTAÇÃO - ${clientName.toUpperCase()}*
+
+*Resumo da Cotação:*
+• Itens: ${selectedItems.length}
+• Total: R$ ${totalCotacao.toFixed(2).replace('.', ',')}
+
+*Itens incluídos:*
+${selectedItems.map(item => {
+    let rawValue = item.vlUnit || '0.00';
+    let cleanValue = String(rawValue).replace('R$', '').replace(/\s/g, '').replace(',', '.');
+    let value = parseFloat(cleanValue);
+    if (isNaN(value)) {
+        value = parseFloat(String(rawValue).replace(/[^\d,]/g, '').replace(',', '.'));
+    }
+    const totalItem = isNaN(value) ? 0 : value * item.quantity;
+    return `• ${item.quantity}x ${item.descricao} - R$ ${totalItem.toFixed(2).replace('.', ',')}`;
+}).join('\n')}
+
+_O arquivo CSV com detalhes completos foi gerado e pode ser anexado como documento._
+
+📅 ${new Date().toLocaleDateString('pt-BR')}
+⏰ ${new Date().toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'})}`;
+        };
+
+        window.clearQuoteWithConfirmation = function() {
+            if (selectedItems.length === 0) {
+                window.showMessage('ℹ️ A lista já está vazia.', 'info');
+                return;
+            }
+            
+            const userConfirmed = confirm('Tem certeza que deseja limpar TODOS os itens da cotação?');
+            if (!userConfirmed) {
+                window.showMessage('❌ Limpeza cancelada.', 'error');
+                return;
+            }
+            
+            selectedItems = [];
+            window.saveQuote();
+            window.renderQuoteList();
+            window.showMessage('✅ Lista de cotação limpa com sucesso!', 'success');
+        };
+
+        window.clearDatabaseWithConfirmation = function() {
+            const userConfirmed = confirm('Tem certeza que deseja limpar TODOS os dados da base?');
+            if (!userConfirmed) {
+                window.showMessage('❌ Limpeza cancelada pelo usuário.', 'error');
+                return;
+            }
+            
+            productDatabase = [];
+            localStorage.removeItem('cotacao_product_database');
+            window.updateProductCountUI();
+            window.showMessage('✅ Base de dados limpa com sucesso!', 'success');
+            window.toggleView('main');
+        };
+
+        window.addProductToQuote = function() {
+            if (!foundProduct) return;
+
+            const quantity = parseInt(quantityInput.value, 10);
+            if (isNaN(quantity) || quantity <= 0) {
+                window.showMessage('Quantidade deve ser um número positivo.', 'error');
+                return;
+            }
+            
+            const quoteItem = {
+                ...foundProduct, 
+                id: crypto.randomUUID(),
+                quantity: quantity
+            };
+
+            selectedItems.push(quoteItem);
+            window.saveQuote();
+            window.showMessage(`✅ Adicionado: ${quantity}x ${foundProduct.descricao}`, 'success');
+            
+            // Limpa a busca após adicionar
+            codeInput.value = '';
+            window.findProduct('');
+            codeInput.focus();
+        };
+
+        window.loadDatabase = function() {
+            try {
+                const storedData = localStorage.getItem('cotacao_product_database');
+                if (storedData) {
+                    productDatabase = JSON.parse(storedData);
+                    // Se não houver dados, carrega base de teste
+                    if (productDatabase.length === 0) {
+                        productDatabase = [
+                            { codigo: '789123', descricao: 'MONITOR LED 24 POLEGADAS FULL HD', vlUnit: '599,90', unidade: 'UN' },
+                            { codigo: '456789', descricao: 'MONITOR GAMER 27 POLEGADAS 144Hz', vlUnit: '899,90', unidade: 'UN' },
+                            { codigo: '123456', descricao: 'MOUSE GAMER RGB PROFISSIONAL', vlUnit: '89,90', unidade: 'UN' },
+                            { codigo: '789012', descricao: 'TECLADO MECANICO RGB AZUL', vlUnit: '199,90', unidade: 'UN' },
+                            { codigo: '345678', descricao: 'WEBCAM 1080P PROFESSIONAL STREAM', vlUnit: '159,90', unidade: 'UN' },
+                            { codigo: '555555', descricao: 'PRODUTO TESTE PRECOS', vlUnit: '55,15', unidade: 'UN' },
+                            { codigo: '666666', descricao: 'OUTRO PRODUTO TESTE', vlUnit: '123,45', unidade: 'UN' }
+                        ];
+                    }
+                } else {
+                    // Carrega base de teste se não houver dados salvos
+                    productDatabase = [
+                        { codigo: '789123', descricao: 'MONITOR LED 24 POLEGADAS FULL HD', vlUnit: '599,90', unidade: 'UN' },
+                        { codigo: '456789', descricao: 'MONITOR GAMER 27 POLEGADAS 144Hz', vlUnit: '899,90', unidade: 'UN' },
+                        { codigo: '123456', descricao: 'MOUSE GAMER RGB PROFISSIONAL', vlUnit: '89,90', unidade: 'UN' },
+                        { codigo: '789012', descricao: 'TECLADO MECANICO RGB AZUL', vlUnit: '199,90', unidade: 'UN' },
+                        { codigo: '345678', descricao: 'WEBCAM 1080P PROFESSIONAL STREAM', vlUnit: '159,90', unidade: 'UN' },
+                        { codigo: '555555', descricao: 'PRODUTO TESTE PRECOS', vlUnit: '55,15', unidade: 'UN' },
+                        { codigo: '666666', descricao: 'OUTRO PRODUTO TESTE', vlUnit: '123,45', unidade: 'UN' }
+                    ];
+                }
+            } catch (e) {
+                productDatabase = [];
+            }
+        };
+        
+        window.saveLocalData = function() {
+            localStorage.setItem('cotacao_product_database', JSON.stringify(productDatabase));
+            window.updateProductCountUI();
+        };
+
+        window.loadQuote = function() {
+            try {
+                const storedQuote = localStorage.getItem('cotacao_current_quote');
+                if (storedQuote) {
+                    selectedItems = JSON.parse(storedQuote);
+                    quoteItemCountSpan.textContent = selectedItems.length;
+                    window.renderQuoteList();
+                    window.updateProductCountUI();
+                }
+            } catch (e) {}
+        };
+        
+        window.saveQuote = function() {
+            localStorage.setItem('cotacao_current_quote', JSON.stringify(selectedItems));
+            quoteItemCountSpan.textContent = selectedItems.length;
+        };
+
+        // Event Listeners
+        codeInput.addEventListener('input', (e) => {
+            window.findProduct(e.target.value);
+        });
+
+        // Substitua a função de importação atual por esta versão corrigida:
+fileInput.addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        try {
+            const csvContent = e.target.result;
+            console.log('Conteúdo do arquivo:', csvContent.substring(0, 500)); // Debug
+            
+            const importedData = parseCSVData(csvContent);
+            
+            if (importedData.length === 0) {
+                window.showMessage('❌ Nenhum dado válido encontrado no arquivo.', 'error');
+                return;
+            }
+            
+            productDatabase = importedData;
+            window.saveLocalData();
+            window.showMessage(`✅ Importação concluída! ${importedData.length} produtos carregados.`, 'success');
+            fileInput.value = '';
+            window.toggleView('main');
+            
+        } catch (error) {
+            console.error('Erro na importação:', error);
+            window.showMessage('❌ Erro ao processar arquivo. Verifique o formato.', 'error');
+        }
+    };
+    
+    reader.onerror = function() {
+        window.showMessage('❌ Erro ao ler arquivo.', 'error');
+    };
+    
+    reader.readAsText(file, 'ISO-8859-1'); // Importante para caracteres especiais
+});
+
+// Função para processar o CSV com a estrutura específica do Espu3.CSV
+function parseCSVData(csvContent) {
+    const lines = csvContent.split('\n').filter(line => line.trim() !== '');
+    
+    if (lines.length <= 1) {
+        window.showMessage('❌ Arquivo vazio ou sem dados.', 'error');
+        return [];
+    }
+    
+    const headers = lines[0].split(';').map(h => h.trim());
+    console.log('Cabeçalhos encontrados:', headers); // Debug
+    
+    const products = [];
+    
+    for (let i = 1; i < lines.length; i++) {
+        try {
+            const line = lines[i];
+            const values = line.split(';').map(v => v.trim());
+            
+            // Verifica se a linha tem dados suficientes
+            if (values.length < headers.length || values[0] === '') {
+                continue;
+            }
+            
+            // Mapeia os campos conforme a estrutura do Espu3.CSV
+            const product = {
+                codigo: values[0] || '', // CODIGO
+                codigoBarras: values[1] || '', // CODIGO BARRAS
+                referencia: values[2] || '', // REFERENCIA
+                descricao: values[3] || '', // DESCRIÇĂO
+                codFabricante: values[4] || '', // COD.FABRICANTE
+                fabricante: values[5] || '', // FABRICANTE
+                unidade: values[6] || 'UN', // UNIDADE
+                quantidade: parseFloat(values[7]?.replace(',', '.') || 0), // QUANTIDADE
+                quantidadeBloq: parseFloat(values[8]?.replace(',', '.') || 0), // QUANTIDADE-BLOQ
+                cstCsosn: values[9] || '', // CST/CSOSN
+                vlUnit: formatPrice(values[10]), // VL-UNIT - CORRIGIDO
+                vlTotal: formatPrice(values[11]), // VL-TOTAL - CORRIGIDO
+                ncm: values[12] || '', // NCM
+                codGrupo: values[13] || '', // COD.GRUPO
+                desGrupo: values[14] || '', // DES.GRUPO
+                codSubgrupo: values[15] || '', // COD.SUBGRUPO
+                desSubgrupo: values[16] || '', // DES.SUBGRUPO
+                codMedida: values[17] || '', // COD.MEDIDA
+                desMedida: values[18] || '', // DES.MEDIDA
+                quantCompra: parseFloat(values[19]?.replace(',', '.') || 0), // QUANT. COMPRA
+                quantCompraMes: parseFloat(values[20]?.replace(',', '.') || 0), // QUANT. COMPRA MES
+                tipoProduto: values[21] || 'Produto' // TIPO DE PRODUTO
+            };
+            
+            // Filtra produtos válidos (com código e descrição)
+            if (product.codigo && product.descricao) {
+                products.push(product);
+            }
+            
+        } catch (lineError) {
+            console.warn(`Erro na linha ${i + 1}:`, lineError);
+            continue;
+        }
+    }
+    
+    console.log(`${products.length} produtos processados com sucesso`);
+    return products;
+}
+
+// Função auxiliar para formatar preços corretamente
+function formatPrice(priceString) {
+    if (!priceString || priceString.trim() === '') return '0,00';
+    
+    // Remove espaços e pontos de milhar, mantém apenas a vírgula decimal
+    let cleanPrice = priceString.toString().trim().replace(/\./g, '').replace(/\s/g, '');
+    
+    // Se não tem vírgula, assume que é valor inteiro
+    if (!cleanPrice.includes(',')) {
+        cleanPrice = cleanPrice + ',00';
+    }
+    
+    // Garante formato brasileiro: 1234,56
+    const parts = cleanPrice.split(',');
+    const integerPart = parts[0].replace(/\D/g, '');
+    const decimalPart = (parts[1] || '00').padEnd(2, '0').substring(0, 2);
+    
+    return `${integerPart},${decimalPart}`;
+}
+
+// Adicione também esta função para debug da importação:
+window.debugImport = function() {
+    console.log('=== DEBUG DA BASE ATUAL ===');
+    console.log('Total de produtos:', productDatabase.length);
+    if (productDatabase.length > 0) {
+        console.log('Primeiros 5 produtos:', productDatabase.slice(0, 5));
+        console.log('Estrutura do primeiro produto:', Object.keys(productDatabase[0]));
+    }
+};
+        // Inicialização - SEMPRE MOSTRA SENHA PRIMEIRO
+        window.onload = () => {
+            passwordModal.style.display = 'block';
+            passwordInput.focus();
+        };
+    </script>
+</body>
+</html>
